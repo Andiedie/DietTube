@@ -171,14 +171,13 @@ async def transcode_file(
     process = await asyncio.create_subprocess_exec(
         *cmd,
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
     )
 
     progress_buffer = ""
     progress_accumulator: dict = {}
 
     assert process.stdout is not None
-    assert process.stderr is not None
 
     try:
         while True:
@@ -196,12 +195,10 @@ async def transcode_file(
                 )
             except asyncio.TimeoutError:
                 if process.returncode is not None:
-                    logger.info(f"FFmpeg exited with code {process.returncode}")
                     break
                 continue
 
             if not chunk:
-                logger.info("FFmpeg stdout closed, waiting for process")
                 break
 
             progress_buffer += chunk.decode("utf-8", errors="ignore")
@@ -213,17 +210,15 @@ async def transcode_file(
                     if progress:
                         on_progress(progress)
 
-        logger.info("Waiting for FFmpeg process to finish")
         await process.wait()
-        logger.info(f"FFmpeg finished with returncode {process.returncode}")
 
         if process.returncode != 0:
-            stderr = await process.stderr.read()
-            error_msg = stderr.decode("utf-8", errors="ignore")
-            logger.error(f"FFmpeg failed: {error_msg}")
             if output_path.exists():
                 output_path.unlink()
-            return TranscodeResult(success=False, error_message=error_msg[-500:])
+            return TranscodeResult(
+                success=False,
+                error_message=f"FFmpeg exited with code {process.returncode}",
+            )
 
         return TranscodeResult(success=True, output_path=output_path)
 
