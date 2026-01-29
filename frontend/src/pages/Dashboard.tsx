@@ -13,6 +13,8 @@ import {
   RotateCcw,
   Pause,
   Play,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react"
 import { api, type Task, type TaskProgress, ApiRequestError } from "@/lib/api"
 import { formatBytes, formatDuration, cn } from "@/lib/utils"
@@ -217,6 +219,9 @@ export default function Dashboard() {
   const queryClient = useQueryClient()
   const { addToast } = useToast()
   const [showPauseDialog, setShowPauseDialog] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [currentPage, setCurrentPage] = useState(0)
+  const [pageSize, setPageSize] = useState(20)
 
   const { data: stats } = useQuery({
     queryKey: ["stats"],
@@ -230,8 +235,12 @@ export default function Dashboard() {
   })
 
   const { data: tasksData } = useQuery({
-    queryKey: ["tasks"],
-    queryFn: () => api.tasks.list(undefined, 20),
+    queryKey: ["tasks", searchQuery, currentPage, pageSize],
+    queryFn: () => api.tasks.list({
+      search: searchQuery || undefined,
+      limit: pageSize,
+      offset: currentPage * pageSize,
+    }),
   })
 
   const { data: queueStatus } = useQuery({
@@ -400,11 +409,44 @@ export default function Dashboard() {
       {progress && <CurrentProgress progress={progress} />}
 
       <div className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-lg overflow-hidden">
-        <div className="px-4 py-3 border-b border-[hsl(var(--border))]">
+        <div className="px-4 py-3 border-b border-[hsl(var(--border))] flex items-center justify-between">
           <h3 className="font-semibold flex items-center">
             <FileVideo className="w-4 h-4 mr-2" />
             任务队列
+            {tasksData && (
+              <span className="ml-2 text-sm font-normal text-[hsl(var(--muted-foreground))]">
+                (共 {tasksData.total} 个)
+              </span>
+            )}
           </h3>
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[hsl(var(--muted-foreground))]" />
+              <input
+                type="text"
+                placeholder="搜索文件名..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value)
+                  setCurrentPage(0)
+                }}
+                className="pl-9 pr-3 py-1.5 w-48 text-sm rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))]"
+              />
+            </div>
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value))
+                setCurrentPage(0)
+              }}
+              className="px-2 py-1.5 text-sm rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))]"
+            >
+              <option value={10}>10 条/页</option>
+              <option value={20}>20 条/页</option>
+              <option value={50}>50 条/页</option>
+              <option value={100}>100 条/页</option>
+            </select>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -437,13 +479,39 @@ export default function Dashboard() {
                     colSpan={5}
                     className="px-4 py-8 text-center text-[hsl(var(--muted-foreground))]"
                   >
-                    暂无任务，点击「扫描视频」查找文件
+                    {searchQuery ? "没有匹配的任务" : "暂无任务，点击「扫描视频」查找文件"}
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
+        {tasksData && tasksData.total > pageSize && (
+          <div className="px-4 py-3 border-t border-[hsl(var(--border))] flex items-center justify-between">
+            <span className="text-sm text-[hsl(var(--muted-foreground))]">
+              显示 {currentPage * pageSize + 1}-{Math.min((currentPage + 1) * pageSize, tasksData.total)} / {tasksData.total}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
+                disabled={currentPage === 0}
+                className="p-1.5 rounded border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))] disabled:opacity-50"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="text-sm px-2">
+                {currentPage + 1} / {Math.ceil(tasksData.total / pageSize)}
+              </span>
+              <button
+                onClick={() => setCurrentPage((p) => p + 1)}
+                disabled={(currentPage + 1) * pageSize >= tasksData.total}
+                className="p-1.5 rounded border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))] disabled:opacity-50"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

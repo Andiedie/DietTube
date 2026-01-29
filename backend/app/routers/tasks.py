@@ -55,6 +55,7 @@ class TaskListResponse(BaseModel):
 @router.get("/", response_model=TaskListResponse)
 async def list_tasks(
     status: Optional[str] = None,
+    search: Optional[str] = None,
     limit: int = 50,
     offset: int = 0,
     db: AsyncSession = Depends(get_db),
@@ -69,6 +70,11 @@ async def list_tasks(
             count_query = count_query.where(Task.status == status_enum)
         except ValueError:
             raise ValidationError(f"无效的状态值: {status}", {"status": status})
+
+    if search:
+        search_pattern = f"%{search}%"
+        query = query.where(Task.relative_path.ilike(search_pattern))
+        count_query = count_query.where(Task.relative_path.ilike(search_pattern))
 
     query = query.order_by(Task.created_at.desc()).offset(offset).limit(limit)
 

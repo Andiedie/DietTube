@@ -122,12 +122,13 @@ async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   tasks: {
-    list: (status?: string, limit = 50, offset = 0) =>
+    list: (params?: { status?: string; search?: string; limit?: number; offset?: number }) =>
       fetchJSON<TaskListResponse>(
         `${API_BASE}/tasks/?${new URLSearchParams({
-          ...(status && { status }),
-          limit: String(limit),
-          offset: String(offset),
+          ...(params?.status && { status: params.status }),
+          ...(params?.search && { search: params.search }),
+          limit: String(params?.limit ?? 20),
+          offset: String(params?.offset ?? 0),
         })}`
       ),
     getProgress: () =>
