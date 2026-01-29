@@ -15,7 +15,7 @@ SOURCE_DIR="$DATA_DIR/source"
 TEMP_DIR="$DATA_DIR/temp"
 CONFIG_DIR="$DATA_DIR/config"
 DB_FILE="$CONFIG_DIR/diettube.db"
-VIDEO_FILE="$PROJECT_ROOT/video.mp4"
+VIDEO_FILE="$PROJECT_ROOT/assets/video.mp4"
 
 echo -e "${YELLOW}========================================${NC}"
 echo -e "${YELLOW}  DietTube 测试环境初始化脚本${NC}"

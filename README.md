@@ -1,6 +1,13 @@
 # DietTube
 
-Self-hosted video transcoding solution using AV1 + Opus for maximum compression. Built for home NAS and media library scenarios.
+<p align="center">
+  <img src="assets/logo.png" alt="DietTube Logo" width="200">
+</p>
+
+<p align="center">
+  Self-hosted video transcoding solution using AV1 + Opus for maximum compression.<br>
+  Built for home NAS and media library scenarios.
+</p>
 
 ## Features
 
