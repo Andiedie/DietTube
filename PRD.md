@@ -3,39 +3,38 @@
 | 项目 | 内容 |
 | --- | --- |
 | **产品名称** | DietTube |
-| **版本号** | **V1.2 (Archive Strategy Edition)** |
+| **版本号** | **V1.4 (Pure Description Edition)** |
 | **文档日期** | 2026-01-29 |
 | **核心标语** | Give your video library a diet. (为你的视频库瘦身) |
-| **产品目标** | 针对家庭 NAS/影音库场景，提供自动化、极致压缩（AV1+Opus）的视频处理方案。在保留字幕、章节和元数据的前提下，通过“无感替换”释放硬盘空间。 |
+| **产品目标** | 针对家庭 NAS/影音库场景，提供自动化、极致压缩（AV1+Opus）的视频处理方案。基于单容器全栈架构，确保高稳定性与空间释放。 |
 
 ---
 
 ## 1. 技术架构选型 (Tech Stack)
 
-### 1.1 总体架构
+### 1.1 前端架构
 
-采用 **All-in-One 单容器架构**。前端构建为静态资源，由后端 Python 服务直接托管。
+* **构建模式:** 采用 **Vite + React (SPA)**。生成纯静态资源（HTML/CSS/JS），无服务端运行时依赖，由后端直接托管。
+* **组件库:** 推荐使用 TailwindCSS 结合 ShadcnUI 以实现高密度的仪表盘界面。
+* **数据同步:** 使用 React Query 进行高效的任务状态轮询，避免复杂的 WebSocket 实现。
 
-### 1.2 前端 (Frontend)
+### 1.2 后端架构
 
-* **框架:** Next.js (App Router) + React.
-* **UI 库:** TailwindCSS (高密度信息展示).
-* **构建:** Static Export (`output: 'export'`)，产物存放于后端 `/static` 目录。
+* **核心服务:** Python (FastAPI)。
+* **数据存储:**
+* **持久化数据:** 使用单文件 SQLite 数据库存储任务队列、配置信息和历史记录。
+* **实时数据:** 任务进度、FPS、预计剩余时间等高频变动数据**仅存储于内存**，避免频繁读写数据库文件导致 I/O 锁死。
 
-### 1.3 后端 (Backend)
 
-* **核心服务:** Python (FastAPI).
-* **职责:** 业务调度、FFmpeg 封装、静态资源托管、API 响应。
-* **数据库:** SQLite (存储于 `/config/db.sqlite`)。
-* **转码引擎:** FFmpeg (需编译支持 `libsvtav1`, `libopus`).
+* **核心引擎:** FFmpeg (必须编译支持 AV1 编码器和 Opus 音频编码器)。
 
-### 1.4 部署环境 (Deployment)
+### 1.3 部署架构
 
-* **运行方式:** `docker run` (单容器)。
-* **目录挂载 (Volumes):**
-1. `/data/source`: **源视频库** (NAS/HDD)。
-2. `/data/temp`: **工作空间** (SSD，高速读写)。
-3. `/config`: **配置持久化** (数据库、日志、配置文件)。
+* **模式:** **All-in-One 单容器 (Single Container)**。
+* **必要挂载点:** 系统需依赖三个核心路径：
+1. **源目录:** 存放原始视频文件的 NAS/HDD 路径。
+2. **临时目录:** 用于高速转码写入和回收站的 SSD 路径。
+3. **配置目录:** 用于持久化存储数据库和配置文件的路径。
 
 
 
@@ -43,182 +42,116 @@
 
 ## 2. 核心业务流程 (Core Logic)
 
-### 2.1 目录结构自动化
+### 2.1 任务处理流水线
 
-系统启动时，后端自动在 `/data/temp` 下维护以下结构：
+系统应按以下步骤串行处理每一个视频文件：
 
-* `/data/temp/processing`: 存放转码中的临时 AV1 文件。
-* `/data/temp/trash`: 存放被替换下来的源文件（仅在“回收站模式”下使用）。
-
-### 2.2 任务流转逻辑 (Pipeline)
-
-1. **Scanner (扫描):**
-* 扫描 `/data/source`。
-* **跳过逻辑:** 检查 `mtime`/`size` 变更 -> 检查 Metadata 是否包含 `DietTube` 标记。
+1. **智能扫描 (Scanner):**
+* 遍历源目录。
+* **跳过机制:** 检查文件元数据是否包含特定标记，或对比文件大小与修改时间是否与数据库记录一致。只有未处理过的文件才会被加入队列。
 
 
-2. **Transcode (转码):**
-* 读取源文件 -> 转码输出至 `/data/temp/processing/<RelPath>/file.mkv`。
+2. **转码执行 (Transcode):**
+* 从源目录读取文件，在临时目录生成 AV1 编码的新文件。
+* 转码过程中，后端需实时计算并更新内存中的 FPS 和进度信息。
 
 
-3. **Verify (校验):**
-* 简单验证输出文件的完整性（如时长对比、流完整性）。
+3. **严格校验 (Verify):**
+* **时长比对:** 必须对比源文件与新文件的时长，误差需控制在极小范围（如 1% 以内）。
+* **流完整性:** 检查新文件是否存在有效的视频流和音频流。
+* **死文件检测:** 检查新文件体积是否过小（如仅有几 KB），防止生成空文件。
+* *失败处理:* 一旦校验不通过，立即标记任务失败并删除临时文件，**严禁**覆盖源文件。
 
 
-4. **Handle Original (源文件处理 - 分支策略):**
-* *根据用户设置（详见 4.1.5）执行移动操作。*
-* **情况 A (回收站):** 移动至 `/data/temp/trash/...`。
-* **情况 B (指定归档):** 移动至用户指定的路径（如 `/data/source/_backup/...`）。
+4. **源文件处置 (Handle Original):**
+* 根据用户设置的策略（回收站模式或归档模式），将源文件移动到对应目录。
+* 移动过程中必须**保留源文件的相对目录结构**，防止文件名冲突。
 
 
-5. **Install (部署):**
-* 将 `/data/temp/processing` 中的新文件移动至 `/data/source`，覆盖原始路径。
-* 向数据库写入状态 `COMPLETED`。
+5. **部署上线 (Install):**
+* 将校验通过的新文件从临时目录移动回源目录，覆盖原始路径。
+* 向新文件注入特定的元数据标记，并更新数据库状态为“已完成”。
 
 
+
+### 2.2 容灾与自愈机制
+
+为了应对断电、容器意外重启等情况，系统启动时必须执行以下自愈逻辑：
+
+1. **状态重置:** 扫描数据库，将所有状态标记为“进行中”的任务重置为“待处理”或“失败”，防止任务卡死在中间状态。
+2. **垃圾清理:** 强制清空临时目录下的“处理中”文件夹，删除所有残留的半成品文件，释放磁盘空间。
 
 ---
 
 ## 3. 转码策略 (Transcoding Strategy)
 
-必须严格执行流映射，确保功能无损。
+核心原则：**极致压缩体积，忽略 HDR，保留辅助数据。**
 
-| 流类型 | 处理动作 | 详细说明 |
+| 流类型 | 处理策略 | 详细说明 |
 | --- | --- | --- |
-| **Video** | **Re-encode (AV1)** | 编码器: `libsvtav1`。核心压缩来源。 |
-| **Audio** | **Re-encode (Opus)** | 编码器: `libopus`。**强制转码所有音轨**以极致节省空间。 |
-| **Subtitle** | **Copy** | 保留所有软字幕 (SRT, ASS, PGS)。 |
-| **Data/Fonts** | **Copy** | 保留章节信息和内封字体附件。 |
-| **Metadata** | **Inject** | 必须注入 `-metadata comment="DietTube"` 以供扫描器识别。 |
+| **视频流** | **AV1 重编码** | 使用 SVT-AV1 编码器。忽略所有 HDR 元数据（按标准 SDR 处理）。允许用户限制 CPU 线程数。 |
+| **音频流** | **Opus 重编码** | **强制转码所有音轨**（包括全景声等）。统一压制为 Opus 格式以换取最大体积缩减。 |
+| **字幕流** | **直接复制** | 保留所有软字幕流（SRT/ASS/PGS），确保字幕样式和特效不丢失。 |
+| **附件流** | **直接复制** | 保留 MKV 内封的字体文件，这对 ASS 字幕的正确渲染至关重要。 |
+| **元数据** | **注入标记** | 写入特定的 Comment 标记，作为后续扫描器识别“已处理文件”的凭证。 |
 
 ---
 
 ## 4. 功能模块需求 (Functional Requirements)
 
-### 4.1 设置页面 (Settings)
+### 4.1 设置模块
 
-#### 4.1.1 视频配置 (Video)
+用户界面需提供以下配置项：
 
-* **Preset:** 0-13 (默认: 4)。
-* **CRF:** 0-63 (默认: 32)。
-* **Film Grain:** 0-50 (默认: 8)。
-* **10-bit:** 强制开启。
+* **视频参数:** 预设速度 (Preset)、质量系数 (CRF)、胶片颗粒 (Film Grain)。
+* **音频参数:** 全局音频码率设置。
+* **性能控制:** 允许限制 FFmpeg 进程可使用的最大 CPU 线程数。
+* **源文件策略:** 选择“移动到回收站”或“移动到指定归档目录”。若选择归档，需提供路径输入框。
+* **命令预览:** 根据当前设置，实时生成并展示将要执行的底层命令文本。
 
-#### 4.1.2 音频配置 (Audio)
+### 4.2 仪表盘模块
 
-* **Bitrate:** (默认: 64k)。
-* **VBR:** On/Off (默认: On)。
+* **统计卡片:** 展示累计节省的存储空间。
+* **任务队列:** 列表展示待处理、进行中、已完成及失败的任务。
+* **进度监控:** 实时展示当前任务的百分比，并根据当前处理速度动态计算**预计剩余时间 (ETA)**。
 
-#### 4.1.3 实时命令预览
+### 4.3 回收站模块
 
-* 提供只读代码块，根据上述配置实时拼接展示 FFmpeg 命令字符串。
-
-#### 4.1.4 高级自定义
-
-* 输入框：允许追加自定义 FFmpeg 参数 (如 `-vf scale=1280:-2`)。
-
-#### 4.1.5 源文件处理策略 (Original File Handling) - **关键逻辑**
-
-* **Mode (模式选择):**
-* `Move to Trash` (默认): 源文件移入 `/data/temp/trash`。
-* `Move to Directory`: 源文件移入指定目录。
-
-
-* **Target Path (目标路径):**
-* 当选择 `Move to Directory` 时必填。
-* 用户需输入容器内路径 (例如 `/data/source/_backup`)。
-* *提示:* "请确保路径已挂载且可写。"
-
-
-
-### 4.2 仪表盘 (Dashboard)
-
-* **Space Saved:** 累计节省空间。
-* **Queue Status:** 排队中 / 处理中 / 已完成 / 失败。
-* **Trash Size:** 仅统计 `/data/temp/trash` 的占用大小。
-
-### 4.3 回收站 (Trash Bin)
-
-* **显示范围:** 仅列出 `/data/temp/trash` 目录下的文件。
-* **清空操作 (Purge):** 点击“Empty Trash”时，仅删除 `/data/temp/trash` 下的内容。
-* *注意:* 若用户配置了“Move to Directory”，则源文件不在回收站管辖范围内，该操作不会影响已归档的文件。
-
-
+* **范围:** 仅管理位于临时目录下的回收站文件夹。
+* **功能:** 提供“一键清空”按钮，物理删除回收站内的所有文件。
 
 ---
 
-## 5. 研发实施细节 (Implementation Notes)
+## 5. 研发实施细节 (Technical Guidelines)
 
-### 5.1 Dockerfile 构建策略 (Multi-stage)
+### 5.1 构建策略 (镜像分层)
 
-```dockerfile
-# Stage 1: Build Frontend
-FROM node:18-alpine AS frontend
-WORKDIR /app
-COPY ./frontend .
-RUN npm install && npm run build
-# 产出物在 /app/out 或 /app/.next/static
+为解决依赖问题，Docker 镜像构建需遵循以下逻辑：
 
-# Stage 2: Final Image
-FROM python:3.11-slim
-# 安装 FFmpeg (需包含 libsvtav1, libopus)
-RUN apt-get update && apt-get install -y ffmpeg ... 
+1. **基础镜像选择:** 必须使用**包含高质量 FFmpeg 构建（支持 SVT-AV1）的镜像**作为最终运行时的底包（Base Image）。
+2. **环境叠加:** 在该底包之上安装 Python 运行时及相关依赖库。
+3. **前端注入:** 使用多阶段构建，先在 Node 环境中编译前端代码，然后将生成的静态资源目录复制到最终镜像中。
 
-WORKDIR /app
-COPY ./backend .
-RUN pip install -r requirements.txt
+### 5.2 性能与 I/O 优化
 
-# 将前端产物拷入后端静态目录
-COPY --from=frontend /app/out /app/static
+* **内存缓存:** 进度、FPS、ETA 等高频变化的数据严禁写入数据库文件，必须维护在 Python 的内存变量中。
+* **数据库写入:** 仅当任务状态发生质变（如开始、完成、失败）时，才对 SQLite 数据库进行写操作。
+* **异步执行:** FFmpeg 进程必须通过异步方式调用，严禁阻塞主线程，以确保 Web 界面在转码期间仍能响应。
 
-# 单一入口
-CMD ["python", "main.py"]
+### 5.3 校验逻辑细节
 
-```
+* **时长判定:** 获取源文件时长和输出文件时长，计算差值比例。若误差超过设定阈值（如 1%），则视为转码失败。
+* **空文件判定:** 检查输出文件大小，若小于特定阈值（如 10KB），则视为转码失败。
 
-### 5.2 路径保持算法 (Python)
+### 5.4 异常处理
 
-在移动源文件到 Trash 或 Archive 时，必须保留相对路径结构，防止同名文件冲突。
+* **转码失败:** 捕获子进程的非零退出码，删除产生的临时文件，在数据库记录错误日志。
+* **用户中断:** 若用户手动取消任务，必须向子进程发送终止信号，并清理残留文件。
 
-```python
-import os, shutil
+### 5.5 部署配置说明
 
-def archive_original_file(config, source_full_path, rel_path):
-    """
-    config.mode: 'TRASH' | 'CUSTOM'
-    config.custom_path: string (e.g., '/data/source/_backup')
-    source_full_path: '/data/source/Movies/Avatar.mkv'
-    rel_path: 'Movies/Avatar.mkv'
-    """
-    
-    if config.mode == 'TRASH':
-        base_dir = "/data/temp/trash"
-    else:
-        base_dir = config.custom_path
+用户在启动容器时，必须通过环境变量或参数配置以下内容：
 
-    # 拼接目标全路径: /data/temp/trash/Movies/Avatar.mkv
-    target_full_path = os.path.join(base_dir, rel_path)
-    
-    # 确保父目录存在
-    os.makedirs(os.path.dirname(target_full_path), exist_ok=True)
-    
-    # 执行移动
-    shutil.move(source_full_path, target_full_path)
-
-```
-
-### 5.3 用户启动命令参考
-
-```bash
-docker run -d \
-  --name diettube \
-  --restart unless-stopped \
-  -p 8000:8000 \
-  -v /mnt/media:/data/source \
-  -v /mnt/ssd/temp:/data/temp \
-  -v ./config:/config \
-  diettube:latest
-
-```
-
-**(完)**
+* **端口映射:** 开放服务端口（如 8000）。
+* **权限映射:** 设置容器运行的用户 ID (PUID) 和组 ID (PGID)，确保容器有权限读写 NAS 文件。
+* **路径映射:** 必须正确挂载 Source、Temp、Config 三个目录。
