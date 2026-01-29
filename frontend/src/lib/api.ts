@@ -109,6 +109,21 @@ export interface TaskLog {
   created_at: string
 }
 
+export interface PermissionTestResult {
+  path: string
+  exists: boolean
+  readable: boolean
+  writable: boolean
+  error: string | null
+}
+
+export interface PermissionTestResponse {
+  source: PermissionTestResult
+  temp: PermissionTestResult
+  config: PermissionTestResult
+  archive: PermissionTestResult | null
+}
+
 async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, options)
   const data = await response.json()
@@ -199,6 +214,8 @@ export const api = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(params),
       }),
+    testPermissions: () =>
+      fetchJSON<PermissionTestResponse>(`${API_BASE}/settings/test-permissions`),
   },
   trash: {
     list: () => fetchJSON<TrashList>(`${API_BASE}/trash/`),

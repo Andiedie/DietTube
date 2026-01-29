@@ -1,7 +1,21 @@
 import { useState, useEffect, useMemo } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { Settings as SettingsIcon, Terminal, Folder, Save, Loader2 } from "lucide-react"
-import { api, type Settings as SettingsType, ApiRequestError } from "@/lib/api"
+import {
+  Settings as SettingsIcon,
+  Terminal,
+  Folder,
+  Save,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  ShieldCheck,
+} from "lucide-react"
+import {
+  api,
+  type Settings as SettingsType,
+  type PermissionTestResponse,
+  ApiRequestError,
+} from "@/lib/api"
 import { useToast } from "@/components/Toast"
 
 function SettingInput({
@@ -88,6 +102,9 @@ export default function Settings() {
   const { addToast } = useToast()
   const [formData, setFormData] = useState<SettingsType | null>(null)
   const [hasChanges, setHasChanges] = useState(false)
+  const [permissionResults, setPermissionResults] =
+    useState<PermissionTestResponse | null>(null)
+  const [testingPermissions, setTestingPermissions] = useState(false)
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ["settings"],
@@ -155,6 +172,21 @@ export default function Settings() {
     }
   }
 
+  const handleTestPermissions = async () => {
+    setTestingPermissions(true)
+    try {
+      const results = await api.settings.testPermissions()
+      setPermissionResults(results)
+      const allOk = results.source.writable && results.temp.writable && results.config.writable &&
+        (!results.archive || results.archive.writable)
+      addToast(allOk ? "所有目录权限正常" : "部分目录权限存在问题", allOk ? "success" : "error")
+    } catch {
+      addToast("权限测试失败", "error")
+    } finally {
+      setTestingPermissions(false)
+    }
+  }
+
   if (isLoading || !formData) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -219,6 +251,74 @@ export default function Settings() {
             description="数据库和配置文件存储"
           />
         </div>
+      </div>
+
+      <div className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-lg p-6">
+        <h2 className="text-lg font-semibold mb-4 flex items-center">
+          <ShieldCheck className="w-5 h-5 mr-2" />
+          权限测试
+        </h2>
+        <p className="text-sm text-[hsl(var(--muted-foreground))] mb-4">
+          测试各目录的读写权限，确保应用能正常工作
+        </p>
+        <button
+          onClick={handleTestPermissions}
+          disabled={testingPermissions}
+          className="flex items-center px-4 py-2 border border-[hsl(var(--border))] rounded-md hover:bg-[hsl(var(--accent))] disabled:opacity-50"
+        >
+          {testingPermissions ? (
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          ) : (
+            <ShieldCheck className="w-4 h-4 mr-2" />
+          )}
+          测试目录权限
+        </button>
+
+        {permissionResults && (
+          <div className="mt-4 space-y-2">
+            {(
+              [
+                ["source", "源目录"],
+                ["temp", "临时目录"],
+                ["config", "配置目录"],
+                ["archive", "归档目录"],
+              ] as const
+            ).map(([key, label]) => {
+              const result = permissionResults[key]
+              if (!result) return null
+              const ok = result.exists && result.readable && result.writable
+              return (
+                <div
+                  key={key}
+                  className={`flex items-center justify-between p-3 rounded-md ${
+                    ok
+                      ? "bg-green-50 dark:bg-green-900/20"
+                      : "bg-red-50 dark:bg-red-900/20"
+                  }`}
+                >
+                  <div className="flex items-center">
+                    {ok ? (
+                      <CheckCircle2 className="w-4 h-4 mr-2 text-green-600" />
+                    ) : (
+                      <XCircle className="w-4 h-4 mr-2 text-red-600" />
+                    )}
+                    <span className="font-medium">{label}</span>
+                    <span className="ml-2 text-sm text-[hsl(var(--muted-foreground))] font-mono">
+                      {result.path}
+                    </span>
+                  </div>
+                  <div className="text-sm">
+                    {ok ? (
+                      <span className="text-green-600">读写正常</span>
+                    ) : (
+                      <span className="text-red-600">{result.error}</span>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       <div className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-lg p-6">

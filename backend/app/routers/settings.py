@@ -1,4 +1,7 @@
 from __future__ import annotations
+import os
+import uuid
+from pathlib import Path
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Optional
@@ -101,3 +104,74 @@ async def generate_command_preview(request: CommandPreviewRequest):
         max_threads=request.max_threads,
     )
     return CommandPreviewResponse(command=command)
+
+
+class PermissionTestResult(BaseModel):
+    path: str
+    exists: bool
+    readable: bool
+    writable: bool
+    error: Optional[str] = None
+
+
+class PermissionTestResponse(BaseModel):
+    source: PermissionTestResult
+    temp: PermissionTestResult
+    config: PermissionTestResult
+    archive: Optional[PermissionTestResult] = None
+
+
+def test_directory_permissions(path_str: str) -> PermissionTestResult:
+    if not path_str:
+        return PermissionTestResult(
+            path=path_str,
+            exists=False,
+            readable=False,
+            writable=False,
+            error="Path not configured",
+        )
+
+    path = Path(path_str)
+    result = PermissionTestResult(
+        path=path_str,
+        exists=path.exists(),
+        readable=False,
+        writable=False,
+    )
+
+    if not path.exists():
+        result.error = "Directory does not exist"
+        return result
+
+    result.readable = os.access(path, os.R_OK)
+    if not result.readable:
+        result.error = "No read permission"
+        return result
+
+    test_file = path / f".diettube_permission_test_{uuid.uuid4().hex}"
+    try:
+        test_file.write_text("test")
+        test_file.unlink()
+        result.writable = True
+    except PermissionError:
+        result.error = "No write permission"
+    except Exception as e:
+        result.error = str(e)
+
+    return result
+
+
+@router.get("/test-permissions", response_model=PermissionTestResponse)
+async def test_permissions():
+    settings = get_settings()
+
+    response = PermissionTestResponse(
+        source=test_directory_permissions(settings.source_dir),
+        temp=test_directory_permissions(settings.temp_dir),
+        config=test_directory_permissions(settings.config_dir),
+    )
+
+    if settings.original_file_strategy == "archive" and settings.archive_dir:
+        response.archive = test_directory_permissions(settings.archive_dir)
+
+    return response

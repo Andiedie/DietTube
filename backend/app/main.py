@@ -4,6 +4,7 @@ from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 from pathlib import Path
 import logging
+import uuid
 
 from app.database import init_db
 from app.services.settings_service import settings_manager, get_settings
