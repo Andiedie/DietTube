@@ -10,3 +10,4 @@ data/
 dist/
 backend/static/
 .vite/
+.DS_Store
