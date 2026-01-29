@@ -1,5 +1,23 @@
 const API_BASE = "/api"
 
+export interface ApiError {
+  code: string
+  message: string
+  details: Record<string, unknown>
+}
+
+export class ApiRequestError extends Error {
+  code: string
+  details: Record<string, unknown>
+
+  constructor(error: ApiError) {
+    super(error.message)
+    this.name = "ApiRequestError"
+    this.code = error.code
+    this.details = error.details
+  }
+}
+
 export interface Task {
   id: number
   source_path: string
@@ -80,10 +98,20 @@ export interface TrashList {
 
 async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, options)
+  const data = await response.json()
+
   if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`)
+    if (data?.error?.code && data?.error?.message) {
+      throw new ApiRequestError(data.error)
+    }
+    throw new ApiRequestError({
+      code: "HTTP_ERROR",
+      message: `请求失败 (${response.status})`,
+      details: {},
+    })
   }
-  return response.json()
+
+  return data
 }
 
 export const api = {

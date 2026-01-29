@@ -1,5 +1,5 @@
 from __future__ import annotations
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
@@ -9,6 +9,7 @@ from app.database import get_db
 from app.models import Task, TaskStatus, ProcessingStats
 from app.services.task_manager import task_manager
 from app.services.scanner import run_scan
+from app.errors import NotFoundError, ValidationError, TaskError
 
 router = APIRouter()
 
@@ -67,7 +68,7 @@ async def list_tasks(
             query = query.where(Task.status == status_enum)
             count_query = count_query.where(Task.status == status_enum)
         except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
+            raise ValidationError(f"无效的状态值: {status}", {"status": status})
 
     query = query.order_by(Task.created_at.desc()).offset(offset).limit(limit)
 
@@ -147,7 +148,7 @@ async def cancel_task(task_id: int):
     if progress and progress.task_id == task_id:
         await task_manager.cancel_current_task()
         return {"message": "Task cancellation requested"}
-    raise HTTPException(status_code=400, detail="Task is not currently running")
+    raise TaskError("该任务当前未在运行", {"task_id": task_id})
 
 
 @router.post("/{task_id}/retry")
@@ -158,11 +159,12 @@ async def retry_task(task_id: int, db: AsyncSession = Depends(get_db)):
     task = result.scalar_one_or_none()
 
     if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+        raise NotFoundError("任务不存在", {"task_id": task_id})
 
     if task.status not in [TaskStatus.FAILED, TaskStatus.CANCELLED]:
-        raise HTTPException(
-            status_code=400, detail="Only failed or cancelled tasks can be retried"
+        raise TaskError(
+            "只有失败或已取消的任务才能重试",
+            {"task_id": task_id, "current_status": task.status.value},
         )
 
     await db.execute(

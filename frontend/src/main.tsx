@@ -7,6 +7,7 @@ import App from "./App"
 import Dashboard from "./pages/Dashboard"
 import Settings from "./pages/Settings"
 import Trash from "./pages/Trash"
+import { ToastProvider } from "./components/Toast"
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -20,15 +21,17 @@ const queryClient = new QueryClient({
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<App />}>
-            <Route index element={<Dashboard />} />
-            <Route path="settings" element={<Settings />} />
-            <Route path="trash" element={<Trash />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+      <ToastProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<App />}>
+              <Route index element={<Dashboard />} />
+              <Route path="settings" element={<Settings />} />
+              <Route path="trash" element={<Trash />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </ToastProvider>
     </QueryClientProvider>
   </React.StrictMode>
 )

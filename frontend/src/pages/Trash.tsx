@@ -1,10 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Trash2, AlertTriangle, Loader2, FileVideo } from "lucide-react"
-import { api } from "@/lib/api"
+import { api, ApiRequestError } from "@/lib/api"
 import { formatBytes } from "@/lib/utils"
+import { useToast } from "@/components/Toast"
 
 export default function Trash() {
   const queryClient = useQueryClient()
+  const { addToast } = useToast()
 
   const { data: trashList, isLoading } = useQuery({
     queryKey: ["trash"],
@@ -13,8 +15,13 @@ export default function Trash() {
 
   const emptyMutation = useMutation({
     mutationFn: api.trash.empty,
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["trash"] })
+      addToast(`已清空回收站，释放 ${formatBytes(data.freed_bytes)}`, "success")
+    },
+    onError: (error) => {
+      const message = error instanceof ApiRequestError ? error.message : "清空回收站失败"
+      addToast(message, "error")
     },
   })
 

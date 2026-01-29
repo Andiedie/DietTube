@@ -11,8 +11,9 @@ import {
   XCircle,
   RotateCcw,
 } from "lucide-react"
-import { api, type Task, type TaskProgress } from "@/lib/api"
+import { api, type Task, type TaskProgress, ApiRequestError } from "@/lib/api"
 import { formatBytes, formatDuration, cn } from "@/lib/utils"
+import { useToast } from "@/components/Toast"
 
 function StatCard({
   title,
@@ -146,11 +147,15 @@ function TaskStatusBadge({ status }: { status: string }) {
   )
 }
 
-function TaskRow({ task }: { task: Task }) {
+function TaskRow({ task, onError }: { task: Task; onError: (msg: string) => void }) {
   const queryClient = useQueryClient()
   const retryMutation = useMutation({
     mutationFn: () => api.tasks.retry(task.id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["tasks"] }),
+    onError: (error) => {
+      const message = error instanceof ApiRequestError ? error.message : "重试失败"
+      onError(message)
+    },
   })
 
   const savedBytes = task.new_size > 0 ? task.original_size - task.new_size : 0
@@ -204,6 +209,7 @@ function TaskRow({ task }: { task: Task }) {
 
 export default function Dashboard() {
   const queryClient = useQueryClient()
+  const { addToast } = useToast()
 
   const { data: stats } = useQuery({
     queryKey: ["stats"],
@@ -226,6 +232,11 @@ export default function Dashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] })
       queryClient.invalidateQueries({ queryKey: ["stats"] })
+      addToast("扫描完成", "success")
+    },
+    onError: (error) => {
+      const message = error instanceof ApiRequestError ? error.message : "扫描失败"
+      addToast(message, "error")
     },
   })
 
@@ -303,7 +314,7 @@ export default function Dashboard() {
             </thead>
             <tbody>
               {tasksData?.tasks.map((task) => (
-                <TaskRow key={task.id} task={task} />
+                <TaskRow key={task.id} task={task} onError={(msg) => addToast(msg, "error")} />
               ))}
               {(!tasksData || tasksData.tasks.length === 0) && (
                 <tr>

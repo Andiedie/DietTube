@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Settings as SettingsIcon, Terminal, Folder, Save, Loader2 } from "lucide-react"
-import { api, type Settings as SettingsType } from "@/lib/api"
+import { api, type Settings as SettingsType, ApiRequestError } from "@/lib/api"
+import { useToast } from "@/components/Toast"
 
 function SettingInput({
   label,
@@ -84,6 +85,7 @@ function SettingSelect({
 
 export default function Settings() {
   const queryClient = useQueryClient()
+  const { addToast } = useToast()
   const [formData, setFormData] = useState<SettingsType | null>(null)
   const [hasChanges, setHasChanges] = useState(false)
 
@@ -105,6 +107,11 @@ export default function Settings() {
       queryClient.invalidateQueries({ queryKey: ["settings"] })
       refetchPreview()
       setHasChanges(false)
+      addToast("设置已保存", "success")
+    },
+    onError: (error) => {
+      const message = error instanceof ApiRequestError ? error.message : "保存设置失败"
+      addToast(message, "error")
     },
   })
 
