@@ -1,8 +1,9 @@
 from __future__ import annotations
 from pydantic_settings import BaseSettings
-from pydantic import Field
+from pydantic import Field, model_validator
 from pathlib import Path
 from functools import lru_cache
+from typing import Optional
 
 
 class Settings(BaseSettings):
@@ -10,7 +11,7 @@ class Settings(BaseSettings):
     temp_dir: Path = Field(default=Path("/temp"))
     config_dir: Path = Field(default=Path("/config"))
 
-    db_path: Path = Field(default=None)
+    db_path: Optional[Path] = Field(default=None)
 
     puid: int = Field(default=1000)
     pgid: int = Field(default=1000)
@@ -22,7 +23,7 @@ class Settings(BaseSettings):
     max_threads: int = Field(default=0)
 
     original_file_strategy: str = Field(default="trash")
-    archive_dir: Path = Field(default=None)
+    archive_dir: Optional[Path] = Field(default=None)
 
     diettube_marker: str = Field(default="DietTube-Processed")
     duration_tolerance: float = Field(default=0.01)
@@ -46,10 +47,11 @@ class Settings(BaseSettings):
 
     model_config = {"env_prefix": "DIETTUBE_"}
 
-    def __init__(self, **data):
-        super().__init__(**data)
+    @model_validator(mode="after")
+    def set_db_path(self) -> "Settings":
         if self.db_path is None:
             object.__setattr__(self, "db_path", self.config_dir / "diettube.db")
+        return self
 
     @property
     def trash_dir(self) -> Path:

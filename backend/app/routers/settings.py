@@ -2,28 +2,30 @@ from __future__ import annotations
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Optional
-from pathlib import Path
 
-from app.config import get_settings
+from app.services.settings_service import get_settings, settings_manager
 from app.services.transcoder import get_ffmpeg_command_preview
 
 router = APIRouter()
 
 
 class SettingsResponse(BaseModel):
+    source_dir: str
+    temp_dir: str
+    config_dir: str
     video_preset: int
     video_crf: int
     video_film_grain: int
     audio_bitrate: str
     max_threads: int
     original_file_strategy: str
-    archive_dir: Optional[str]
-    source_dir: str
-    temp_dir: str
-    config_dir: str
+    archive_dir: str
 
 
 class SettingsUpdate(BaseModel):
+    source_dir: Optional[str] = None
+    temp_dir: Optional[str] = None
+    config_dir: Optional[str] = None
     video_preset: Optional[int] = None
     video_crf: Optional[int] = None
     video_film_grain: Optional[int] = None
@@ -41,16 +43,38 @@ class CommandPreviewResponse(BaseModel):
 async def get_current_settings():
     settings = get_settings()
     return SettingsResponse(
+        source_dir=settings.source_dir,
+        temp_dir=settings.temp_dir,
+        config_dir=settings.config_dir,
         video_preset=settings.video_preset,
         video_crf=settings.video_crf,
         video_film_grain=settings.video_film_grain,
         audio_bitrate=settings.audio_bitrate,
         max_threads=settings.max_threads,
         original_file_strategy=settings.original_file_strategy,
-        archive_dir=str(settings.archive_dir) if settings.archive_dir else None,
-        source_dir=str(settings.source_dir),
-        temp_dir=str(settings.temp_dir),
-        config_dir=str(settings.config_dir),
+        archive_dir=settings.archive_dir or "",
+    )
+
+
+@router.put("/", response_model=SettingsResponse)
+async def update_settings(updates: SettingsUpdate):
+    update_dict = {k: v for k, v in updates.model_dump().items() if v is not None}
+
+    if update_dict:
+        await settings_manager.save_to_db(update_dict)
+
+    settings = get_settings()
+    return SettingsResponse(
+        source_dir=settings.source_dir,
+        temp_dir=settings.temp_dir,
+        config_dir=settings.config_dir,
+        video_preset=settings.video_preset,
+        video_crf=settings.video_crf,
+        video_film_grain=settings.video_film_grain,
+        audio_bitrate=settings.audio_bitrate,
+        max_threads=settings.max_threads,
+        original_file_strategy=settings.original_file_strategy,
+        archive_dir=settings.archive_dir or "",
     )
 
 

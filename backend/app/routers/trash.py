@@ -4,7 +4,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from pathlib import Path
 
-from app.config import get_settings
+from app.services.settings_service import get_settings
 
 router = APIRouter()
 

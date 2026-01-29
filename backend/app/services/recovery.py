@@ -4,7 +4,7 @@ import logging
 
 from sqlalchemy import select, update
 
-from app.config import get_settings
+from app.services.settings_service import get_settings
 from app.database import async_session_maker
 from app.models import Task, TaskStatus
 

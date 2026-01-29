@@ -39,3 +39,12 @@ class ProcessingStats(Base):
     total_saved_bytes = Column(Integer, default=0)
     total_processed_files = Column(Integer, default=0)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class AppSettings(Base):
+    __tablename__ = "app_settings"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    key = Column(String, nullable=False, unique=True, index=True)
+    value = Column(Text, nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

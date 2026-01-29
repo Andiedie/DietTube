@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from app.config import get_settings
+from app.services.settings_service import get_settings
 from app.database import async_session_maker
 from app.models import Task, TaskStatus
 
@@ -48,7 +48,7 @@ def is_already_processed(metadata: dict, marker: str) -> bool:
 
 async def scan_directory() -> list[Path]:
     settings = get_settings()
-    source_dir = settings.source_dir
+    source_dir = settings.source_path
     extensions = settings.video_extensions
     marker = settings.diettube_marker
 
@@ -75,7 +75,7 @@ async def scan_directory() -> list[Path]:
 
 async def create_tasks_for_files(files: list[Path]) -> int:
     settings = get_settings()
-    source_dir = settings.source_dir
+    source_dir = settings.source_path
     created_count = 0
 
     async with async_session_maker() as session:

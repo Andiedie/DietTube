@@ -7,7 +7,7 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Callable
 
-from app.config import get_settings
+from app.services.settings_service import get_settings
 
 logger = logging.getLogger(__name__)
 

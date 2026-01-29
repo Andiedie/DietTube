@@ -1,15 +1,20 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
-from app.config import get_settings
+from pathlib import Path
+import os
 
 
 class Base(DeclarativeBase):
     pass
 
 
-settings = get_settings()
+def get_db_path() -> Path:
+    config_dir = Path(os.environ.get("DIETTUBE_CONFIG_DIR", "/config"))
+    return config_dir / "diettube.db"
+
+
 engine = create_async_engine(
-    f"sqlite+aiosqlite:///{settings.db_path}",
+    f"sqlite+aiosqlite:///{get_db_path()}",
     echo=False,
 )
 async_session_maker = async_sessionmaker(

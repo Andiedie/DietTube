@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import select, update, func as sql_func
 
-from app.config import get_settings
+from app.services.settings_service import get_settings
 from app.database import async_session_maker
 from app.models import Task, TaskStatus, ProcessingStats
 from app.services.scanner import get_video_metadata

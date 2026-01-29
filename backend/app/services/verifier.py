@@ -4,7 +4,7 @@ from pathlib import Path
 from dataclasses import dataclass
 
 from app.services.scanner import get_video_metadata
-from app.config import get_settings
+from app.services.settings_service import get_settings
 
 logger = logging.getLogger(__name__)
 

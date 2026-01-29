@@ -1,19 +1,28 @@
-import { useQuery } from "@tanstack/react-query"
-import { Settings as SettingsIcon, Terminal, Folder } from "lucide-react"
-import { api } from "@/lib/api"
+import { useState, useEffect } from "react"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { Settings as SettingsIcon, Terminal, Folder, Save, Loader2 } from "lucide-react"
+import { api, type Settings as SettingsType } from "@/lib/api"
 
-function SettingRow({
+function SettingInput({
   label,
   value,
+  onChange,
   description,
+  type = "text",
+  min,
+  max,
 }: {
   label: string
   value: string | number
+  onChange: (value: string | number) => void
   description?: string
+  type?: "text" | "number"
+  min?: number
+  max?: number
 }) {
   return (
     <div className="flex items-center justify-between py-3 border-b border-[hsl(var(--border))] last:border-0">
-      <div>
+      <div className="flex-1">
         <p className="font-medium">{label}</p>
         {description && (
           <p className="text-sm text-[hsl(var(--muted-foreground))]">
@@ -21,31 +30,150 @@ function SettingRow({
           </p>
         )}
       </div>
-      <span className="text-[hsl(var(--muted-foreground))] font-mono bg-[hsl(var(--muted))] px-3 py-1 rounded">
-        {value}
-      </span>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) =>
+          onChange(type === "number" ? Number(e.target.value) : e.target.value)
+        }
+        min={min}
+        max={max}
+        className="w-48 px-3 py-1.5 rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-right font-mono focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))]"
+      />
+    </div>
+  )
+}
+
+function SettingSelect({
+  label,
+  value,
+  onChange,
+  options,
+  description,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  options: { value: string; label: string }[]
+  description?: string
+}) {
+  return (
+    <div className="flex items-center justify-between py-3 border-b border-[hsl(var(--border))] last:border-0">
+      <div className="flex-1">
+        <p className="font-medium">{label}</p>
+        {description && (
+          <p className="text-sm text-[hsl(var(--muted-foreground))]">
+            {description}
+          </p>
+        )}
+      </div>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-48 px-3 py-1.5 rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] text-right font-mono focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))]"
+      >
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
     </div>
   )
 }
 
 export default function Settings() {
-  const { data: settings } = useQuery({
+  const queryClient = useQueryClient()
+  const [formData, setFormData] = useState<SettingsType | null>(null)
+  const [hasChanges, setHasChanges] = useState(false)
+
+  const { data: settings, isLoading } = useQuery({
     queryKey: ["settings"],
     queryFn: api.settings.get,
     refetchInterval: false,
   })
 
-  const { data: commandPreview } = useQuery({
+  const { data: commandPreview, refetch: refetchPreview } = useQuery({
     queryKey: ["commandPreview"],
     queryFn: api.settings.getCommandPreview,
     refetchInterval: false,
   })
 
+  const updateMutation = useMutation({
+    mutationFn: api.settings.update,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["settings"] })
+      refetchPreview()
+      setHasChanges(false)
+    },
+  })
+
+  useEffect(() => {
+    if (settings && !formData) {
+      setFormData(settings)
+    }
+  }, [settings, formData])
+
+  const handleChange = <K extends keyof SettingsType>(
+    key: K,
+    value: SettingsType[K]
+  ) => {
+    if (formData) {
+      setFormData({ ...formData, [key]: value })
+      setHasChanges(true)
+    }
+  }
+
+  const handleSave = () => {
+    if (formData) {
+      updateMutation.mutate(formData)
+    }
+  }
+
+  const handleReset = () => {
+    if (settings) {
+      setFormData(settings)
+      setHasChanges(false)
+    }
+  }
+
+  if (isLoading || !formData) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="w-8 h-8 animate-spin text-[hsl(var(--muted-foreground))]" />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center">
-        <SettingsIcon className="w-6 h-6 mr-2 text-[hsl(var(--primary))]" />
-        <h1 className="text-2xl font-bold">Settings</h1>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center">
+          <SettingsIcon className="w-6 h-6 mr-2 text-[hsl(var(--primary))]" />
+          <h1 className="text-2xl font-bold">Settings</h1>
+        </div>
+        {hasChanges && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleReset}
+              className="px-4 py-2 border border-[hsl(var(--border))] rounded-md hover:bg-[hsl(var(--accent))]"
+            >
+              Reset
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={updateMutation.isPending}
+              className="flex items-center px-4 py-2 bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] rounded-md hover:opacity-90 disabled:opacity-50"
+            >
+              {updateMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="w-4 h-4 mr-2" />
+              )}
+              Save Changes
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-lg p-6">
@@ -54,19 +182,22 @@ export default function Settings() {
           Directory Configuration
         </h2>
         <div className="space-y-2">
-          <SettingRow
+          <SettingInput
             label="Source Directory"
-            value={settings?.source_dir || "-"}
+            value={formData.source_dir}
+            onChange={(v) => handleChange("source_dir", String(v))}
             description="Where your video files are located"
           />
-          <SettingRow
+          <SettingInput
             label="Temp Directory"
-            value={settings?.temp_dir || "-"}
+            value={formData.temp_dir}
+            onChange={(v) => handleChange("temp_dir", String(v))}
             description="For processing and trash storage"
           />
-          <SettingRow
+          <SettingInput
             label="Config Directory"
-            value={settings?.config_dir || "-"}
+            value={formData.config_dir}
+            onChange={(v) => handleChange("config_dir", String(v))}
             description="Database and configuration files"
           />
         </div>
@@ -75,20 +206,32 @@ export default function Settings() {
       <div className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-lg p-6">
         <h2 className="text-lg font-semibold mb-4">Video Encoding Settings</h2>
         <div className="space-y-2">
-          <SettingRow
+          <SettingInput
             label="Preset"
-            value={settings?.video_preset ?? "-"}
+            value={formData.video_preset}
+            onChange={(v) => handleChange("video_preset", Number(v))}
             description="SVT-AV1 encoding speed (0=slowest/best, 13=fastest)"
+            type="number"
+            min={0}
+            max={13}
           />
-          <SettingRow
+          <SettingInput
             label="CRF"
-            value={settings?.video_crf ?? "-"}
+            value={formData.video_crf}
+            onChange={(v) => handleChange("video_crf", Number(v))}
             description="Constant Rate Factor (0=lossless, 63=worst)"
+            type="number"
+            min={0}
+            max={63}
           />
-          <SettingRow
+          <SettingInput
             label="Film Grain"
-            value={settings?.video_film_grain ?? "-"}
+            value={formData.video_film_grain}
+            onChange={(v) => handleChange("video_film_grain", Number(v))}
             description="Synthetic grain synthesis (0-50)"
+            type="number"
+            min={0}
+            max={50}
           />
         </div>
       </div>
@@ -96,10 +239,11 @@ export default function Settings() {
       <div className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-lg p-6">
         <h2 className="text-lg font-semibold mb-4">Audio Settings</h2>
         <div className="space-y-2">
-          <SettingRow
+          <SettingInput
             label="Bitrate"
-            value={settings?.audio_bitrate || "-"}
-            description="Opus audio bitrate"
+            value={formData.audio_bitrate}
+            onChange={(v) => handleChange("audio_bitrate", String(v))}
+            description="Opus audio bitrate (e.g., 128k, 192k)"
           />
         </div>
       </div>
@@ -107,20 +251,29 @@ export default function Settings() {
       <div className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-lg p-6">
         <h2 className="text-lg font-semibold mb-4">Processing Settings</h2>
         <div className="space-y-2">
-          <SettingRow
+          <SettingInput
             label="Max Threads"
-            value={settings?.max_threads === 0 ? "Auto" : settings?.max_threads ?? "-"}
+            value={formData.max_threads}
+            onChange={(v) => handleChange("max_threads", Number(v))}
             description="CPU threads for encoding (0=auto)"
+            type="number"
+            min={0}
           />
-          <SettingRow
+          <SettingSelect
             label="Original File Strategy"
-            value={settings?.original_file_strategy || "-"}
+            value={formData.original_file_strategy}
+            onChange={(v) => handleChange("original_file_strategy", v)}
             description="What to do with original files after processing"
+            options={[
+              { value: "trash", label: "Move to Trash" },
+              { value: "archive", label: "Move to Archive" },
+            ]}
           />
-          {settings?.archive_dir && (
-            <SettingRow
+          {formData.original_file_strategy === "archive" && (
+            <SettingInput
               label="Archive Directory"
-              value={settings.archive_dir}
+              value={formData.archive_dir}
+              onChange={(v) => handleChange("archive_dir", String(v))}
               description="Where to move original files"
             />
           )}
@@ -137,11 +290,13 @@ export default function Settings() {
         </pre>
       </div>
 
-      <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-        <p className="text-sm text-yellow-800 dark:text-yellow-200">
-          Settings are configured via environment variables. Restart the container to apply changes.
-        </p>
-      </div>
+      {hasChanges && (
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+          <p className="text-sm text-yellow-800 dark:text-yellow-200">
+            You have unsaved changes. Click "Save Changes" to apply.
+          </p>
+        </div>
+      )}
     </div>
   )
 }

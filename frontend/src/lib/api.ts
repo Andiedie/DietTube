@@ -42,10 +42,23 @@ export interface Settings {
   audio_bitrate: string
   max_threads: number
   original_file_strategy: string
-  archive_dir: string | null
+  archive_dir: string
   source_dir: string
   temp_dir: string
   config_dir: string
+}
+
+export interface SettingsUpdate {
+  source_dir?: string
+  temp_dir?: string
+  config_dir?: string
+  video_preset?: number
+  video_crf?: number
+  video_film_grain?: number
+  audio_bitrate?: string
+  max_threads?: number
+  original_file_strategy?: string
+  archive_dir?: string
 }
 
 export interface TrashInfo {
@@ -101,6 +114,12 @@ export const api = {
   },
   settings: {
     get: () => fetchJSON<Settings>(`${API_BASE}/settings/`),
+    update: (settings: SettingsUpdate) =>
+      fetchJSON<Settings>(`${API_BASE}/settings/`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(settings),
+      }),
     getCommandPreview: () =>
       fetchJSON<{ command: string }>(`${API_BASE}/settings/command-preview`),
   },
