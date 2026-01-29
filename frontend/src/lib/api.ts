@@ -146,6 +146,11 @@ export const api = {
       fetchJSON<{ message: string }>(`${API_BASE}/tasks/${taskId}/retry`, {
         method: "POST",
       }),
+    rollback: (taskId: number) =>
+      fetchJSON<{ message: string; restored_path: string }>(
+        `${API_BASE}/tasks/${taskId}/rollback`,
+        { method: "POST" }
+      ),
     getQueueStatus: () =>
       fetchJSON<QueueStatus>(`${API_BASE}/tasks/queue/status`),
     pauseQueue: (immediate = false) =>

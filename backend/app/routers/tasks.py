@@ -1,6 +1,8 @@
 from __future__ import annotations
+import shutil
+from pathlib import Path
 from fastapi import APIRouter, Depends
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 from typing import Optional
@@ -9,6 +11,7 @@ from app.database import get_db
 from app.models import Task, TaskStatus, ProcessingStats
 from app.services.task_manager import task_manager
 from app.services.scanner import run_scan
+from app.services.settings_service import get_settings
 from app.errors import NotFoundError, ValidationError, TaskError
 
 router = APIRouter()
@@ -159,17 +162,19 @@ async def cancel_task(task_id: int):
 
 @router.post("/{task_id}/retry")
 async def retry_task(task_id: int, db: AsyncSession = Depends(get_db)):
-    from sqlalchemy import update
-
     result = await db.execute(select(Task).where(Task.id == task_id))
     task = result.scalar_one_or_none()
 
     if not task:
         raise NotFoundError("任务不存在", {"task_id": task_id})
 
-    if task.status not in [TaskStatus.FAILED, TaskStatus.CANCELLED]:
+    if task.status not in [
+        TaskStatus.FAILED,
+        TaskStatus.CANCELLED,
+        TaskStatus.ROLLED_BACK,
+    ]:
         raise TaskError(
-            "只有失败或已取消的任务才能重试",
+            "只有失败、已取消或已回滚的任务才能重试",
             {"task_id": task_id, "current_status": task.status.value},
         )
 
@@ -224,3 +229,79 @@ async def pause_queue(request: PauseRequest | None = None):
 async def resume_queue():
     task_manager.resume()
     return {"message": "队列已继续", "is_paused": False}
+
+
+@router.post("/{task_id}/rollback")
+async def rollback_task(task_id: int, db: AsyncSession = Depends(get_db)):
+    """回滚已完成的任务：恢复原始文件，删除转码后的文件，状态改为已回滚"""
+    result = await db.execute(select(Task).where(Task.id == task_id))
+    task = result.scalar_one_or_none()
+
+    if not task:
+        raise NotFoundError("任务不存在", {"task_id": task_id})
+
+    if task.status != TaskStatus.COMPLETED:
+        raise TaskError(
+            "只有已完成的任务才能回滚",
+            {"task_id": task_id, "current_status": task.status.value},
+        )
+
+    settings = get_settings()
+    source_path = Path(task.source_path)
+    relative_path = Path(task.relative_path)
+
+    # 查找原始文件：先检查 trash，再检查 archive
+    original_backup = None
+    backup_locations = [settings.trash_dir / relative_path]
+    if settings.archive_dir:
+        backup_locations.append(Path(settings.archive_dir) / relative_path)
+
+    for loc in backup_locations:
+        if loc.exists():
+            original_backup = loc
+            break
+
+    if not original_backup:
+        raise TaskError(
+            "原始文件不存在，无法回滚",
+            {"searched_paths": [str(p) for p in backup_locations]},
+        )
+
+    # 删除转码后的文件（当前在 source_path 位置）
+    if source_path.exists():
+        source_path.unlink()
+
+    # 恢复原始文件
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(original_backup), str(source_path))
+
+    # 清理空目录
+    try:
+        original_backup.parent.rmdir()
+    except OSError:
+        pass  # 目录非空，忽略
+
+    # 更新统计数据
+    saved_bytes = task.original_size - task.new_size
+    stats_result = await db.execute(select(ProcessingStats).limit(1))
+    stats = stats_result.scalar_one_or_none()
+    if stats:
+        await db.execute(
+            update(ProcessingStats)
+            .where(ProcessingStats.id == stats.id)
+            .values(
+                total_saved_bytes=ProcessingStats.total_saved_bytes - saved_bytes,
+                total_processed_files=ProcessingStats.total_processed_files - 1,
+            )
+        )
+
+    # 更新任务状态为已回滚
+    await db.execute(
+        update(Task).where(Task.id == task_id).values(status=TaskStatus.ROLLED_BACK)
+    )
+    await db.commit()
+
+    return {
+        "message": "任务已回滚，原始文件已恢复",
+        "restored_path": str(source_path),
+    }

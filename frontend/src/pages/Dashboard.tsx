@@ -15,6 +15,7 @@ import {
   Play,
   ChevronLeft,
   ChevronRight,
+  Undo2,
 } from "lucide-react"
 import { api, type Task, type TaskProgress, ApiRequestError } from "@/lib/api"
 import { formatBytes, formatDuration, cn } from "@/lib/utils"
@@ -133,6 +134,11 @@ function TaskStatusBadge({ status }: { status: string }) {
       className: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
       label: "已取消",
     },
+    rolled_back: {
+      icon: Undo2,
+      className: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+      label: "已回滚",
+    },
   }
 
   const config = statusConfig[status] || statusConfig.pending
@@ -153,13 +159,30 @@ function TaskStatusBadge({ status }: { status: string }) {
   )
 }
 
-function TaskRow({ task, onError }: { task: Task; onError: (msg: string) => void }) {
+function TaskRow({ task, onError, onSuccess }: { task: Task; onError: (msg: string) => void; onSuccess: (msg: string) => void }) {
   const queryClient = useQueryClient()
+  const [showRollbackDialog, setShowRollbackDialog] = useState(false)
+
   const retryMutation = useMutation({
     mutationFn: () => api.tasks.retry(task.id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["tasks"] }),
     onError: (error) => {
       const message = error instanceof ApiRequestError ? error.message : "重试失败"
+      onError(message)
+    },
+  })
+
+  const rollbackMutation = useMutation({
+    mutationFn: () => api.tasks.rollback(task.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] })
+      queryClient.invalidateQueries({ queryKey: ["stats"] })
+      setShowRollbackDialog(false)
+      onSuccess("已回滚，原始文件已恢复")
+    },
+    onError: (error) => {
+      const message = error instanceof ApiRequestError ? error.message : "回滚失败"
+      setShowRollbackDialog(false)
       onError(message)
     },
   })
@@ -192,7 +215,7 @@ function TaskRow({ task, onError }: { task: Task; onError: (msg: string) => void
         )}
       </td>
       <td className="px-4 py-3 text-sm">
-        {task.status === "failed" || task.status === "cancelled" ? (
+        {(task.status === "failed" || task.status === "cancelled" || task.status === "rolled_back") ? (
           <button
             onClick={() => retryMutation.mutate()}
             disabled={retryMutation.isPending}
@@ -200,6 +223,16 @@ function TaskRow({ task, onError }: { task: Task; onError: (msg: string) => void
           >
             <RotateCcw className="w-3 h-3 mr-1" />
             重试
+          </button>
+        ) : null}
+        {task.status === "completed" ? (
+          <button
+            onClick={() => setShowRollbackDialog(true)}
+            disabled={rollbackMutation.isPending}
+            className="flex items-center text-orange-600 dark:text-orange-400 hover:underline disabled:opacity-50"
+          >
+            <Undo2 className="w-3 h-3 mr-1" />
+            回滚
           </button>
         ) : null}
         {task.error_message && (
@@ -210,6 +243,38 @@ function TaskRow({ task, onError }: { task: Task; onError: (msg: string) => void
             {task.error_message}
           </span>
         )}
+
+        <Dialog
+          open={showRollbackDialog}
+          onClose={() => setShowRollbackDialog(false)}
+          title="确认回滚"
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-[hsl(var(--muted-foreground))]">
+              回滚将执行以下操作：
+            </p>
+            <ul className="text-sm space-y-2 list-disc list-inside text-[hsl(var(--foreground))]">
+              <li>删除当前的转码文件</li>
+              <li>从回收站/归档目录恢复原始文件</li>
+              <li>统计数据中减去此任务节省的空间</li>
+            </ul>
+            <p className="text-sm font-medium text-[hsl(var(--foreground))]">
+              文件：{task.relative_path}
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <DialogButton variant="secondary" onClick={() => setShowRollbackDialog(false)}>
+                取消
+              </DialogButton>
+              <DialogButton
+                variant="destructive"
+                onClick={() => rollbackMutation.mutate()}
+                disabled={rollbackMutation.isPending}
+              >
+                {rollbackMutation.isPending ? "回滚中..." : "确认回滚"}
+              </DialogButton>
+            </div>
+          </div>
+        </Dialog>
       </td>
     </tr>
   )
@@ -471,7 +536,7 @@ export default function Dashboard() {
             </thead>
             <tbody>
               {tasksData?.tasks.map((task) => (
-                <TaskRow key={task.id} task={task} onError={(msg) => addToast(msg, "error")} />
+                <TaskRow key={task.id} task={task} onError={(msg) => addToast(msg, "error")} onSuccess={(msg) => addToast(msg, "success")} />
               ))}
               {(!tasksData || tasksData.tasks.length === 0) && (
                 <tr>

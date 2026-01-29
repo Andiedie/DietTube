@@ -14,6 +14,7 @@ class TaskStatus(str, enum.Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"
+    ROLLED_BACK = "rolled_back"
 
 
 class Task(Base):
