@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Settings as SettingsIcon, Terminal, Folder, Save, Loader2 } from "lucide-react"
 import { api, type Settings as SettingsType, ApiRequestError } from "@/lib/api"
@@ -95,9 +95,21 @@ export default function Settings() {
     refetchInterval: false,
   })
 
-  const { data: commandPreview, refetch: refetchPreview } = useQuery({
-    queryKey: ["commandPreview"],
-    queryFn: api.settings.getCommandPreview,
+  const previewParams = useMemo(() => {
+    if (!formData) return null
+    return {
+      video_preset: formData.video_preset,
+      video_crf: formData.video_crf,
+      video_film_grain: formData.video_film_grain,
+      audio_bitrate: formData.audio_bitrate,
+      max_threads: formData.max_threads,
+    }
+  }, [formData?.video_preset, formData?.video_crf, formData?.video_film_grain, formData?.audio_bitrate, formData?.max_threads])
+
+  const { data: commandPreview } = useQuery({
+    queryKey: ["commandPreview", previewParams],
+    queryFn: () => previewParams ? api.settings.generateCommandPreview(previewParams) : null,
+    enabled: !!previewParams,
     refetchInterval: false,
   })
 
@@ -105,7 +117,6 @@ export default function Settings() {
     mutationFn: api.settings.update,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["settings"] })
-      refetchPreview()
       setHasChanges(false)
       addToast("设置已保存", "success")
     },

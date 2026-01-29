@@ -67,7 +67,7 @@ def build_ffmpeg_command(
             "-svtav1-params",
             f"film-grain={settings.video_film_grain}",
             "-pix_fmt",
-            "yuv420p",
+            "yuv420p10le",
         ]
     )
 
@@ -201,4 +201,58 @@ async def transcode_file(
 def get_ffmpeg_command_preview() -> str:
     settings = get_settings()
     cmd = build_ffmpeg_command(Path("/input.mkv"), Path("/output.mkv"), 0)
+    return " ".join(cmd)
+
+
+def build_command_preview(
+    video_preset: int,
+    video_crf: int,
+    video_film_grain: int,
+    audio_bitrate: str,
+    max_threads: int,
+) -> str:
+    settings = get_settings()
+
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-i",
+        "/input.mkv",
+        "-map",
+        "0:v:0",
+        "-map",
+        "0:a?",
+        "-map",
+        "0:s?",
+        "-map",
+        "0:t?",
+        "-c:v",
+        "libsvtav1",
+        "-preset",
+        str(video_preset),
+        "-crf",
+        str(video_crf),
+        "-svtav1-params",
+        f"film-grain={video_film_grain}",
+        "-pix_fmt",
+        "yuv420p10le",
+        "-c:a",
+        "libopus",
+        "-b:a",
+        audio_bitrate,
+        "-vbr",
+        "on",
+        "-c:s",
+        "copy",
+        "-c:t",
+        "copy",
+        "-metadata",
+        f"comment={settings.diettube_marker}",
+    ]
+
+    if max_threads > 0:
+        cmd.extend(["-threads", str(max_threads)])
+
+    cmd.append("/output.mkv")
+
     return " ".join(cmd)

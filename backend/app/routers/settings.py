@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 from app.services.settings_service import get_settings, settings_manager
-from app.services.transcoder import get_ffmpeg_command_preview
+from app.services.transcoder import get_ffmpeg_command_preview, build_command_preview
 
 router = APIRouter()
 
@@ -81,3 +81,23 @@ async def update_settings(updates: SettingsUpdate):
 @router.get("/command-preview", response_model=CommandPreviewResponse)
 async def get_command_preview():
     return CommandPreviewResponse(command=get_ffmpeg_command_preview())
+
+
+class CommandPreviewRequest(BaseModel):
+    video_preset: int
+    video_crf: int
+    video_film_grain: int
+    audio_bitrate: str
+    max_threads: int
+
+
+@router.post("/command-preview", response_model=CommandPreviewResponse)
+async def generate_command_preview(request: CommandPreviewRequest):
+    command = build_command_preview(
+        video_preset=request.video_preset,
+        video_crf=request.video_crf,
+        video_film_grain=request.video_film_grain,
+        audio_bitrate=request.audio_bitrate,
+        max_threads=request.max_threads,
+    )
+    return CommandPreviewResponse(command=command)

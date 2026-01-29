@@ -173,6 +173,18 @@ export const api = {
       }),
     getCommandPreview: () =>
       fetchJSON<{ command: string }>(`${API_BASE}/settings/command-preview`),
+    generateCommandPreview: (params: {
+      video_preset: number
+      video_crf: number
+      video_film_grain: number
+      audio_bitrate: string
+      max_threads: number
+    }) =>
+      fetchJSON<{ command: string }>(`${API_BASE}/settings/command-preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(params),
+      }),
   },
   trash: {
     list: () => fetchJSON<TrashList>(`${API_BASE}/trash/`),

@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     video_preset: int = Field(default=6, ge=0, le=13)
     video_crf: int = Field(default=30, ge=0, le=63)
     video_film_grain: int = Field(default=0, ge=0, le=50)
-    audio_bitrate: str = Field(default="128k")
+    audio_bitrate: str = Field(default="64k")
     max_threads: int = Field(default=0)
 
     original_file_strategy: str = Field(default="trash")
