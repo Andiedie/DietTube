@@ -11,8 +11,12 @@ from sqlalchemy import select, update, func as sql_func
 from app.services.settings_service import get_settings
 from app.database import async_session_maker
 from app.models import Task, TaskStatus, ProcessingStats, TaskLog, LogLevel
-from app.services.scanner import get_video_metadata
-from app.services.transcoder import transcode_file, TranscodeProgress
+from app.services.scanner import get_video_metadata, build_ffprobe_command
+from app.services.transcoder import (
+    transcode_file,
+    TranscodeProgress,
+    build_ffmpeg_command,
+)
 from app.services.verifier import verify_output
 
 if TYPE_CHECKING:
@@ -138,6 +142,10 @@ class TaskManager:
         try:
             await self._log(task.id, f"开始处理: {task.relative_path}")
             await self._log(task.id, f"原始文件大小: {task.original_size:,} 字节")
+
+            ffprobe_cmd = build_ffprobe_command(source_path)
+            await self._log(task.id, f"ffprobe: {' '.join(ffprobe_cmd)}")
+
             await self._update_task_status(task.id, TaskStatus.TRANSCODING)
 
             metadata = await get_video_metadata(source_path)
@@ -147,6 +155,12 @@ class TaskManager:
 
             await self._update_task_duration(task.id, original_duration)
             await self._log(task.id, f"视频时长: {original_duration:.1f} 秒")
+
+            ffmpeg_cmd = build_ffmpeg_command(
+                source_path, temp_output, original_duration
+            )
+            await self._log(task.id, f"ffmpeg: {' '.join(ffmpeg_cmd)}")
+
             await self._log(
                 task.id,
                 f"开始转码 (preset={settings.video_preset}, crf={settings.video_crf})",

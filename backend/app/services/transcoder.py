@@ -79,6 +79,8 @@ def build_ffmpeg_command(
             settings.audio_bitrate,
             "-vbr",
             "on",
+            "-ac",
+            "2",
         ]
     )
 
@@ -106,28 +108,57 @@ def build_ffmpeg_command(
     return cmd
 
 
-def parse_progress_line(line: str, total_duration: float) -> TranscodeProgress | None:
-    progress = TranscodeProgress(total_duration=total_duration)
+def parse_progress_line(
+    line: str, total_duration: float, accumulator: dict
+) -> TranscodeProgress | None:
+    """解析 FFmpeg 进度行，累积到 accumulator 中，遇到 progress= 行时返回完整进度"""
+    line = line.strip()
+    if not line or "=" not in line:
+        return None
 
-    fps_match = re.search(r"fps=(\d+\.?\d*)", line)
-    if fps_match:
-        progress.fps = float(fps_match.group(1))
+    key, _, value = line.partition("=")
+    key = key.strip()
+    value = value.strip()
 
-    speed_match = re.search(r"speed=(\d+\.?\d*)x", line)
-    if speed_match:
-        progress.speed = float(speed_match.group(1))
+    if key == "fps":
+        try:
+            accumulator["fps"] = float(value)
+        except ValueError:
+            pass
+    elif key == "speed":
+        speed_match = re.search(r"([\d.]+)x", value)
+        if speed_match:
+            try:
+                accumulator["speed"] = float(speed_match.group(1))
+            except ValueError:
+                pass
+    elif key == "out_time_ms":
+        try:
+            accumulator["current_time"] = int(value) / 1_000_000
+        except ValueError:
+            pass
+    elif key == "progress":
+        current_time = accumulator.get("current_time", 0)
+        speed = accumulator.get("speed", 0)
+        progress_pct = 0.0
+        eta = 0.0
 
-    time_match = re.search(r"out_time_ms=(\d+)", line)
-    if time_match:
-        progress.current_time = int(time_match.group(1)) / 1_000_000
-        if total_duration > 0:
-            progress.progress = min(progress.current_time / total_duration, 1.0)
+        if total_duration > 0 and current_time > 0:
+            progress_pct = min(current_time / total_duration, 1.0)
+            if speed > 0:
+                remaining = total_duration - current_time
+                eta = remaining / speed
 
-            if progress.speed > 0:
-                remaining = total_duration - progress.current_time
-                progress.eta_seconds = remaining / progress.speed
+        return TranscodeProgress(
+            fps=accumulator.get("fps", 0),
+            speed=speed,
+            progress=progress_pct,
+            eta_seconds=eta,
+            current_time=current_time,
+            total_duration=total_duration,
+        )
 
-    return progress
+    return None
 
 
 async def transcode_file(
@@ -147,6 +178,10 @@ async def transcode_file(
     )
 
     progress_buffer = ""
+    progress_accumulator: dict = {}
+
+    assert process.stdout is not None
+    assert process.stderr is not None
 
     try:
         while True:
@@ -175,7 +210,7 @@ async def transcode_file(
             while "\n" in progress_buffer:
                 line, progress_buffer = progress_buffer.split("\n", 1)
                 if on_progress:
-                    progress = parse_progress_line(line, duration)
+                    progress = parse_progress_line(line, duration, progress_accumulator)
                     if progress:
                         on_progress(progress)
 
@@ -242,6 +277,8 @@ def build_command_preview(
         audio_bitrate,
         "-vbr",
         "on",
+        "-ac",
+        "2",
         "-c:s",
         "copy",
         "-c:t",

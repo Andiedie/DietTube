@@ -16,17 +16,24 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def build_ffprobe_command(file_path: Path) -> list[str]:
+    return [
+        "ffprobe",
+        "-v",
+        "quiet",
+        "-print_format",
+        "json",
+        "-show_format",
+        "-show_streams",
+        str(file_path),
+    ]
+
+
 async def get_video_metadata(file_path: Path) -> dict | None:
+    cmd = build_ffprobe_command(file_path)
     try:
         proc = await asyncio.create_subprocess_exec(
-            "ffprobe",
-            "-v",
-            "quiet",
-            "-print_format",
-            "json",
-            "-show_format",
-            "-show_streams",
-            str(file_path),
+            *cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
