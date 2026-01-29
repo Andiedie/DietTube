@@ -102,6 +102,13 @@ export interface QueueStatus {
   has_active_task: boolean
 }
 
+export interface TaskLog {
+  id: number
+  level: "info" | "warning" | "error"
+  message: string
+  created_at: string
+}
+
 async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, options)
   const data = await response.json()
@@ -151,6 +158,8 @@ export const api = {
         `${API_BASE}/tasks/${taskId}/rollback`,
         { method: "POST" }
       ),
+    getLogs: (taskId: number) =>
+      fetchJSON<{ logs: TaskLog[] }>(`${API_BASE}/tasks/${taskId}/logs`),
     getQueueStatus: () =>
       fetchJSON<QueueStatus>(`${API_BASE}/tasks/queue/status`),
     pauseQueue: (immediate = false) =>

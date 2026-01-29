@@ -10,7 +10,7 @@ from sqlalchemy import select, update, func as sql_func
 
 from app.services.settings_service import get_settings
 from app.database import async_session_maker
-from app.models import Task, TaskStatus, ProcessingStats
+from app.models import Task, TaskStatus, ProcessingStats, TaskLog, LogLevel
 from app.services.scanner import get_video_metadata
 from app.services.transcoder import transcode_file, TranscodeProgress
 from app.services.verifier import verify_output
@@ -136,6 +136,8 @@ class TaskManager:
         temp_output = settings.processing_dir / f"{task.id}_{source_path.name}"
 
         try:
+            await self._log(task.id, f"开始处理: {task.relative_path}")
+            await self._log(task.id, f"原始文件大小: {task.original_size:,} 字节")
             await self._update_task_status(task.id, TaskStatus.TRANSCODING)
 
             metadata = await get_video_metadata(source_path)
@@ -144,6 +146,11 @@ class TaskManager:
             )
 
             await self._update_task_duration(task.id, original_duration)
+            await self._log(task.id, f"视频时长: {original_duration:.1f} 秒")
+            await self._log(
+                task.id,
+                f"开始转码 (preset={settings.video_preset}, crf={settings.video_crf})",
+            )
 
             def on_progress(p: TranscodeProgress):
                 if self._state.current_progress:
@@ -161,9 +168,13 @@ class TaskManager:
             )
 
             if not result.success:
+                await self._log(
+                    task.id, f"转码失败: {result.error_message}", LogLevel.ERROR
+                )
                 await self._fail_task(task.id, result.error_message)
                 return
 
+            await self._log(task.id, "转码完成，开始校验")
             await self._update_task_status(task.id, TaskStatus.VERIFYING)
             self._state.current_progress.status = "verifying"
 
@@ -171,19 +182,37 @@ class TaskManager:
                 source_path, temp_output, original_duration
             )
             if not verify_result.success:
+                await self._log(
+                    task.id, f"校验失败: {verify_result.error_message}", LogLevel.ERROR
+                )
                 if temp_output.exists():
                     temp_output.unlink()
                 await self._fail_task(task.id, verify_result.error_message)
                 return
 
+            await self._log(
+                task.id, f"校验通过，新文件大小: {verify_result.new_size:,} 字节"
+            )
             await self._update_task_status(task.id, TaskStatus.INSTALLING)
             self._state.current_progress.status = "installing"
 
+            await self._log(
+                task.id, f"移动原始文件到: {settings.original_file_strategy}"
+            )
             await self._handle_original_file(source_path, task.relative_path)
 
             shutil.move(str(temp_output), str(source_path))
 
             saved_bytes = task.original_size - verify_result.new_size
+            saved_percent = (
+                (saved_bytes / task.original_size * 100)
+                if task.original_size > 0
+                else 0
+            )
+            await self._log(
+                task.id, f"处理完成，节省: {saved_bytes:,} 字节 ({saved_percent:.1f}%)"
+            )
+
             await self._complete_task(
                 task.id,
                 verify_result.new_size,
@@ -193,6 +222,7 @@ class TaskManager:
 
         except Exception as e:
             logger.exception(f"Task {task.id} failed: {e}")
+            await self._log(task.id, f"处理异常: {str(e)}", LogLevel.ERROR)
             if temp_output.exists():
                 temp_output.unlink()
             await self._fail_task(task.id, str(e))
@@ -285,5 +315,60 @@ class TaskManager:
 
         logger.info(f"Task {task_id} completed, saved {saved_bytes} bytes")
 
+    async def _log(self, task_id: int, message: str, level: LogLevel = LogLevel.INFO):
+        """记录任务执行日志到数据库并广播"""
+        async with async_session_maker() as session:
+            log_entry = TaskLog(task_id=task_id, level=level, message=message)
+            session.add(log_entry)
+            await session.commit()
+            await session.refresh(log_entry)
+            # 广播日志事件
+            log_broadcaster.broadcast(
+                task_id,
+                {
+                    "id": log_entry.id,
+                    "level": level.value,
+                    "message": message,
+                    "created_at": log_entry.created_at.isoformat()
+                    if log_entry.created_at
+                    else "",
+                },
+            )
 
+
+class LogBroadcaster:
+    """日志广播器，管理 SSE 连接"""
+
+    def __init__(self):
+        self._subscribers: dict[int, list[asyncio.Queue]] = {}
+
+    def subscribe(self, task_id: int) -> asyncio.Queue:
+        """订阅指定任务的日志"""
+        queue: asyncio.Queue = asyncio.Queue()
+        if task_id not in self._subscribers:
+            self._subscribers[task_id] = []
+        self._subscribers[task_id].append(queue)
+        return queue
+
+    def unsubscribe(self, task_id: int, queue: asyncio.Queue):
+        """取消订阅"""
+        if task_id in self._subscribers:
+            try:
+                self._subscribers[task_id].remove(queue)
+                if not self._subscribers[task_id]:
+                    del self._subscribers[task_id]
+            except ValueError:
+                pass
+
+    def broadcast(self, task_id: int, log_data: dict):
+        """广播日志到所有订阅者"""
+        if task_id in self._subscribers:
+            for queue in self._subscribers[task_id]:
+                try:
+                    queue.put_nowait(log_data)
+                except asyncio.QueueFull:
+                    pass
+
+
+log_broadcaster = LogBroadcaster()
 task_manager = TaskManager()

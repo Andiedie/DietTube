@@ -1,15 +1,18 @@
 from __future__ import annotations
+import asyncio
+import json
 import shutil
 from pathlib import Path
 from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 from typing import Optional
 
 from app.database import get_db
-from app.models import Task, TaskStatus, ProcessingStats
-from app.services.task_manager import task_manager
+from app.models import Task, TaskStatus, ProcessingStats, TaskLog
+from app.services.task_manager import task_manager, log_broadcaster
 from app.services.scanner import run_scan
 from app.services.settings_service import get_settings
 from app.errors import NotFoundError, ValidationError, TaskError
@@ -305,3 +308,81 @@ async def rollback_task(task_id: int, db: AsyncSession = Depends(get_db)):
         "message": "任务已回滚，原始文件已恢复",
         "restored_path": str(source_path),
     }
+
+
+class TaskLogResponse(BaseModel):
+    id: int
+    level: str
+    message: str
+    created_at: str
+
+    class Config:
+        from_attributes = True
+
+
+class TaskLogsResponse(BaseModel):
+    logs: list[TaskLogResponse]
+
+
+@router.get("/{task_id}/logs", response_model=TaskLogsResponse)
+async def get_task_logs(task_id: int, db: AsyncSession = Depends(get_db)):
+    """获取任务执行日志"""
+    # 先检查任务是否存在
+    result = await db.execute(select(Task).where(Task.id == task_id))
+    task = result.scalar_one_or_none()
+    if not task:
+        raise NotFoundError("任务不存在", {"task_id": task_id})
+
+    # 获取日志
+    logs_result = await db.execute(
+        select(TaskLog).where(TaskLog.task_id == task_id).order_by(TaskLog.created_at)
+    )
+    logs = logs_result.scalars().all()
+
+    return TaskLogsResponse(
+        logs=[
+            TaskLogResponse(
+                id=log.id,
+                level=log.level.value,
+                message=log.message,
+                created_at=log.created_at.isoformat() if log.created_at else "",
+            )
+            for log in logs
+        ]
+    )
+
+
+@router.get("/{task_id}/logs/stream")
+async def stream_task_logs(task_id: int, db: AsyncSession = Depends(get_db)):
+    """SSE 流式推送任务日志"""
+    # 先检查任务是否存在
+    result = await db.execute(select(Task).where(Task.id == task_id))
+    task = result.scalar_one_or_none()
+    if not task:
+        raise NotFoundError("任务不存在", {"task_id": task_id})
+
+    async def event_generator():
+        queue = log_broadcaster.subscribe(task_id)
+        try:
+            while True:
+                try:
+                    # 等待新日志，超时 30 秒发送心跳
+                    log_data = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    yield f"data: {json.dumps(log_data, ensure_ascii=False)}\n\n"
+                except asyncio.TimeoutError:
+                    # 发送心跳保持连接
+                    yield ": heartbeat\n\n"
+        except asyncio.CancelledError:
+            pass
+        finally:
+            log_broadcaster.unsubscribe(task_id, queue)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

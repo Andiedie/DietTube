@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   HardDrive,
@@ -16,8 +16,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Undo2,
+  FileText,
 } from "lucide-react"
-import { api, type Task, type TaskProgress, ApiRequestError } from "@/lib/api"
+import { api, type Task, type TaskProgress, type TaskLog, ApiRequestError } from "@/lib/api"
 import { formatBytes, formatDuration, cn } from "@/lib/utils"
 import { useToast } from "@/components/Toast"
 import { Dialog, DialogButton } from "@/components/Dialog"
@@ -162,6 +163,75 @@ function TaskStatusBadge({ status }: { status: string }) {
 function TaskRow({ task, onError, onSuccess }: { task: Task; onError: (msg: string) => void; onSuccess: (msg: string) => void }) {
   const queryClient = useQueryClient()
   const [showRollbackDialog, setShowRollbackDialog] = useState(false)
+  const [showLogsDialog, setShowLogsDialog] = useState(false)
+  const [logs, setLogs] = useState<TaskLog[]>([])
+  const [logsLoading, setLogsLoading] = useState(false)
+  const eventSourceRef = useRef<EventSource | null>(null)
+  const logsContainerRef = useRef<HTMLDivElement | null>(null)
+
+  // 清理 SSE 连接
+  useEffect(() => {
+    return () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close()
+      }
+    }
+  }, [])
+
+  // 自动滚动到底部
+  useEffect(() => {
+    if (logsContainerRef.current) {
+      logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight
+    }
+  }, [logs])
+
+  const handleShowLogs = async () => {
+    setShowLogsDialog(true)
+    setLogsLoading(true)
+    try {
+      // 先获取历史日志
+      const result = await api.tasks.getLogs(task.id)
+      setLogs(result.logs)
+
+      // 如果任务正在进行中，订阅实时日志
+      const isActive = ["transcoding", "verifying", "installing"].includes(task.status)
+      if (isActive) {
+        // 关闭旧连接
+        if (eventSourceRef.current) {
+          eventSourceRef.current.close()
+        }
+        // 建立 SSE 连接
+        const es = new EventSource(`/api/tasks/${task.id}/logs/stream`)
+        eventSourceRef.current = es
+
+        es.onmessage = (event) => {
+          try {
+            const newLog = JSON.parse(event.data) as TaskLog
+            setLogs((prev) => [...prev, newLog])
+          } catch {
+            // 忽略解析错误
+          }
+        }
+
+        es.onerror = () => {
+          es.close()
+        }
+      }
+    } catch (error) {
+      const message = error instanceof ApiRequestError ? error.message : "获取日志失败"
+      onError(message)
+    } finally {
+      setLogsLoading(false)
+    }
+  }
+
+  const handleCloseLogsDialog = () => {
+    setShowLogsDialog(false)
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close()
+      eventSourceRef.current = null
+    }
+  }
 
   const retryMutation = useMutation({
     mutationFn: () => api.tasks.retry(task.id),
@@ -215,34 +285,88 @@ function TaskRow({ task, onError, onSuccess }: { task: Task; onError: (msg: stri
         )}
       </td>
       <td className="px-4 py-3 text-sm">
-        {(task.status === "failed" || task.status === "cancelled" || task.status === "rolled_back") ? (
-          <button
-            onClick={() => retryMutation.mutate()}
-            disabled={retryMutation.isPending}
-            className="flex items-center text-[hsl(var(--primary))] hover:underline disabled:opacity-50"
-          >
-            <RotateCcw className="w-3 h-3 mr-1" />
-            重试
-          </button>
-        ) : null}
-        {task.status === "completed" ? (
-          <button
-            onClick={() => setShowRollbackDialog(true)}
-            disabled={rollbackMutation.isPending}
-            className="flex items-center text-orange-600 dark:text-orange-400 hover:underline disabled:opacity-50"
-          >
-            <Undo2 className="w-3 h-3 mr-1" />
-            回滚
-          </button>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {task.status !== "pending" && (
+            <button
+              onClick={handleShowLogs}
+              className="flex items-center text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:underline"
+              title="查看日志"
+            >
+              <FileText className="w-3 h-3 mr-1" />
+              日志
+            </button>
+          )}
+          {(task.status === "failed" || task.status === "cancelled" || task.status === "rolled_back") ? (
+            <button
+              onClick={() => retryMutation.mutate()}
+              disabled={retryMutation.isPending}
+              className="flex items-center text-[hsl(var(--primary))] hover:underline disabled:opacity-50"
+            >
+              <RotateCcw className="w-3 h-3 mr-1" />
+              重试
+            </button>
+          ) : null}
+          {task.status === "completed" ? (
+            <button
+              onClick={() => setShowRollbackDialog(true)}
+              disabled={rollbackMutation.isPending}
+              className="flex items-center text-orange-600 dark:text-orange-400 hover:underline disabled:opacity-50"
+            >
+              <Undo2 className="w-3 h-3 mr-1" />
+              回滚
+            </button>
+          ) : null}
+        </div>
         {task.error_message && (
           <span
-            className="text-red-500 text-xs truncate max-w-[200px] block"
+            className="text-red-500 text-xs truncate max-w-[200px] block mt-1"
             title={task.error_message}
           >
             {task.error_message}
           </span>
         )}
+
+        <Dialog
+          open={showLogsDialog}
+          onClose={handleCloseLogsDialog}
+          title={`任务日志 - ${task.relative_path}`}
+        >
+          <div ref={logsContainerRef} className="max-h-96 overflow-y-auto">
+            {logsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-[hsl(var(--muted-foreground))]" />
+              </div>
+            ) : logs.length === 0 ? (
+              <p className="text-center text-[hsl(var(--muted-foreground))] py-8">
+                暂无日志
+              </p>
+            ) : (
+              <div className="font-mono text-xs">
+                {logs.map((log) => (
+                  <div
+                    key={log.id}
+                    className={cn(
+                      "px-2 py-0.5",
+                      log.level === "error" && "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200",
+                      log.level === "warning" && "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200",
+                      log.level === "info" && "text-[hsl(var(--foreground))]"
+                    )}
+                  >
+                    <span className="text-[hsl(var(--muted-foreground))] mr-2">
+                      {new Date(log.created_at).toLocaleTimeString()}
+                    </span>
+                    {log.message}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end pt-4">
+            <DialogButton variant="secondary" onClick={handleCloseLogsDialog}>
+              关闭
+            </DialogButton>
+          </div>
+        </Dialog>
 
         <Dialog
           open={showRollbackDialog}
