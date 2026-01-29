@@ -4,9 +4,9 @@ import { cn } from "./lib/utils"
 
 function App() {
   const navItems = [
-    { to: "/", icon: LayoutDashboard, label: "Dashboard" },
-    { to: "/settings", icon: Settings, label: "Settings" },
-    { to: "/trash", icon: Trash2, label: "Trash" },
+    { to: "/", icon: LayoutDashboard, label: "仪表盘" },
+    { to: "/settings", icon: Settings, label: "设置" },
+    { to: "/trash", icon: Trash2, label: "回收站" },
   ]
 
   return (
@@ -19,7 +19,7 @@ function App() {
                 DietTube
               </span>
               <span className="ml-2 text-sm text-[hsl(var(--muted-foreground))]">
-                Give your video library a diet
+                为你的视频库瘦身
               </span>
             </div>
             <div className="flex space-x-4">

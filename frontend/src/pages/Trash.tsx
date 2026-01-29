@@ -23,7 +23,7 @@ export default function Trash() {
       <div className="flex items-center justify-between">
         <div className="flex items-center">
           <Trash2 className="w-6 h-6 mr-2 text-[hsl(var(--primary))]" />
-          <h1 className="text-2xl font-bold">Trash</h1>
+          <h1 className="text-2xl font-bold">回收站</h1>
         </div>
         {trashList && trashList.file_count > 0 && (
           <button
@@ -36,7 +36,7 @@ export default function Trash() {
             ) : (
               <Trash2 className="w-4 h-4 mr-2" />
             )}
-            Empty Trash
+            清空回收站
           </button>
         )}
       </div>
@@ -44,13 +44,13 @@ export default function Trash() {
       <div className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-lg p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <p className="text-sm text-[hsl(var(--muted-foreground))]">Total Size</p>
+            <p className="text-sm text-[hsl(var(--muted-foreground))]">总大小</p>
             <p className="text-3xl font-bold">
               {formatBytes(trashList?.total_size || 0)}
             </p>
           </div>
           <div>
-            <p className="text-sm text-[hsl(var(--muted-foreground))]">Files</p>
+            <p className="text-sm text-[hsl(var(--muted-foreground))]">文件数</p>
             <p className="text-3xl font-bold">{trashList?.file_count || 0}</p>
           </div>
         </div>
@@ -61,12 +61,11 @@ export default function Trash() {
               <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mr-2 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                  Warning
+                  警告
                 </p>
                 <p className="text-sm text-yellow-700 dark:text-yellow-300">
-                  These are original video files that have been processed. 
-                  Emptying the trash will permanently delete them and free up{" "}
-                  <strong>{formatBytes(trashList.total_size)}</strong> of disk space.
+                  这些是已处理视频的原始文件。清空回收站将永久删除它们，
+                  释放 <strong>{formatBytes(trashList.total_size)}</strong> 的磁盘空间。
                 </p>
               </div>
             </div>
@@ -83,10 +82,10 @@ export default function Trash() {
               <thead className="bg-[hsl(var(--muted))]">
                 <tr>
                   <th className="px-4 py-2 text-left text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase">
-                    File
+                    文件
                   </th>
                   <th className="px-4 py-2 text-right text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase">
-                    Size
+                    大小
                   </th>
                 </tr>
               </thead>
@@ -115,7 +114,7 @@ export default function Trash() {
         ) : (
           <div className="text-center py-12 text-[hsl(var(--muted-foreground))]">
             <Trash2 className="w-12 h-12 mx-auto mb-4 opacity-50" />
-            <p>Trash is empty</p>
+            <p>回收站是空的</p>
           </div>
         )}
       </div>

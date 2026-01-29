@@ -150,7 +150,7 @@ export default function Settings() {
       <div className="flex items-center justify-between">
         <div className="flex items-center">
           <SettingsIcon className="w-6 h-6 mr-2 text-[hsl(var(--primary))]" />
-          <h1 className="text-2xl font-bold">Settings</h1>
+          <h1 className="text-2xl font-bold">设置</h1>
         </div>
         {hasChanges && (
           <div className="flex items-center gap-2">
@@ -158,7 +158,7 @@ export default function Settings() {
               onClick={handleReset}
               className="px-4 py-2 border border-[hsl(var(--border))] rounded-md hover:bg-[hsl(var(--accent))]"
             >
-              Reset
+              重置
             </button>
             <button
               onClick={handleSave}
@@ -170,7 +170,7 @@ export default function Settings() {
               ) : (
                 <Save className="w-4 h-4 mr-2" />
               )}
-              Save Changes
+              保存更改
             </button>
           </div>
         )}
@@ -179,56 +179,56 @@ export default function Settings() {
       <div className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-lg p-6">
         <h2 className="text-lg font-semibold mb-4 flex items-center">
           <Folder className="w-5 h-5 mr-2" />
-          Directory Configuration
+          目录配置
         </h2>
         <div className="space-y-2">
           <SettingInput
-            label="Source Directory"
+            label="源目录"
             value={formData.source_dir}
             onChange={(v) => handleChange("source_dir", String(v))}
-            description="Where your video files are located"
+            description="视频文件所在的目录"
           />
           <SettingInput
-            label="Temp Directory"
+            label="临时目录"
             value={formData.temp_dir}
             onChange={(v) => handleChange("temp_dir", String(v))}
-            description="For processing and trash storage"
+            description="用于处理和回收站存储"
           />
           <SettingInput
-            label="Config Directory"
+            label="配置目录"
             value={formData.config_dir}
             onChange={(v) => handleChange("config_dir", String(v))}
-            description="Database and configuration files"
+            description="数据库和配置文件存储"
           />
         </div>
       </div>
 
       <div className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-lg p-6">
-        <h2 className="text-lg font-semibold mb-4">Video Encoding Settings</h2>
+        <h2 className="text-lg font-semibold mb-4">视频编码设置</h2>
         <div className="space-y-2">
           <SettingInput
-            label="Preset"
+            label="预设速度"
             value={formData.video_preset}
             onChange={(v) => handleChange("video_preset", Number(v))}
-            description="SVT-AV1 encoding speed (0=slowest/best, 13=fastest)"
+            description="SVT-AV1 编码速度（0=最慢/最佳，13=最快）"
             type="number"
             min={0}
             max={13}
           />
           <SettingInput
-            label="CRF"
+            label="质量系数 (CRF)"
             value={formData.video_crf}
             onChange={(v) => handleChange("video_crf", Number(v))}
-            description="Constant Rate Factor (0=lossless, 63=worst)"
+            description="恒定质量因子（0=无损，63=最差）"
             type="number"
             min={0}
             max={63}
           />
           <SettingInput
-            label="Film Grain"
+            label="胶片颗粒"
             value={formData.video_film_grain}
             onChange={(v) => handleChange("video_film_grain", Number(v))}
-            description="Synthetic grain synthesis (0-50)"
+            description="合成颗粒强度（0-50）"
             type="number"
             min={0}
             max={50}
@@ -237,44 +237,44 @@ export default function Settings() {
       </div>
 
       <div className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-lg p-6">
-        <h2 className="text-lg font-semibold mb-4">Audio Settings</h2>
+        <h2 className="text-lg font-semibold mb-4">音频设置</h2>
         <div className="space-y-2">
           <SettingInput
-            label="Bitrate"
+            label="码率"
             value={formData.audio_bitrate}
             onChange={(v) => handleChange("audio_bitrate", String(v))}
-            description="Opus audio bitrate (e.g., 128k, 192k)"
+            description="Opus 音频码率（如 128k、192k）"
           />
         </div>
       </div>
 
       <div className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-lg p-6">
-        <h2 className="text-lg font-semibold mb-4">Processing Settings</h2>
+        <h2 className="text-lg font-semibold mb-4">处理设置</h2>
         <div className="space-y-2">
           <SettingInput
-            label="Max Threads"
+            label="最大线程数"
             value={formData.max_threads}
             onChange={(v) => handleChange("max_threads", Number(v))}
-            description="CPU threads for encoding (0=auto)"
+            description="编码使用的 CPU 线程数（0=自动）"
             type="number"
             min={0}
           />
           <SettingSelect
-            label="Original File Strategy"
+            label="源文件策略"
             value={formData.original_file_strategy}
             onChange={(v) => handleChange("original_file_strategy", v)}
-            description="What to do with original files after processing"
+            description="处理完成后如何处理原始文件"
             options={[
-              { value: "trash", label: "Move to Trash" },
-              { value: "archive", label: "Move to Archive" },
+              { value: "trash", label: "移动到回收站" },
+              { value: "archive", label: "移动到归档目录" },
             ]}
           />
           {formData.original_file_strategy === "archive" && (
             <SettingInput
-              label="Archive Directory"
+              label="归档目录"
               value={formData.archive_dir}
               onChange={(v) => handleChange("archive_dir", String(v))}
-              description="Where to move original files"
+              description="原始文件的归档位置"
             />
           )}
         </div>
@@ -283,17 +283,17 @@ export default function Settings() {
       <div className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-lg p-6">
         <h2 className="text-lg font-semibold mb-4 flex items-center">
           <Terminal className="w-5 h-5 mr-2" />
-          FFmpeg Command Preview
+          FFmpeg 命令预览
         </h2>
         <pre className="bg-[hsl(var(--muted))] p-4 rounded-lg overflow-x-auto text-sm font-mono whitespace-pre-wrap break-all">
-          {commandPreview?.command || "Loading..."}
+          {commandPreview?.command || "加载中..."}
         </pre>
       </div>
 
       {hasChanges && (
         <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
           <p className="text-sm text-yellow-800 dark:text-yellow-200">
-            You have unsaved changes. Click "Save Changes" to apply.
+            您有未保存的更改，点击「保存更改」以应用。
           </p>
         </div>
       )}

@@ -44,10 +44,17 @@ function StatCard({
 }
 
 function ProgressBar({ progress, status }: { progress: number; status: string }) {
+  const statusLabels: Record<string, string> = {
+    transcoding: "转码中",
+    verifying: "校验中",
+    installing: "安装中",
+  }
   return (
     <div className="w-full">
       <div className="flex justify-between text-sm mb-1">
-        <span className="text-[hsl(var(--muted-foreground))]">{status}</span>
+        <span className="text-[hsl(var(--muted-foreground))]">
+          {statusLabels[status] || status}
+        </span>
         <span className="font-medium">{(progress * 100).toFixed(1)}%</span>
       </div>
       <div className="w-full bg-[hsl(var(--secondary))] rounded-full h-2">
@@ -66,12 +73,12 @@ function CurrentProgress({ progress }: { progress: TaskProgress }) {
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold flex items-center">
           <Loader2 className="w-4 h-4 mr-2 animate-spin text-[hsl(var(--primary))]" />
-          Processing Task #{progress.task_id}
+          正在处理任务 #{progress.task_id}
         </h3>
         <div className="flex items-center space-x-4 text-sm text-[hsl(var(--muted-foreground))]">
           <span>FPS: {progress.fps.toFixed(1)}</span>
-          <span>Speed: {progress.speed.toFixed(2)}x</span>
-          <span>ETA: {formatDuration(progress.eta_seconds)}</span>
+          <span>速度: {progress.speed.toFixed(2)}x</span>
+          <span>剩余: {formatDuration(progress.eta_seconds)}</span>
         </div>
       </div>
       <ProgressBar progress={progress.progress} status={progress.status} />
@@ -87,37 +94,37 @@ function TaskStatusBadge({ status }: { status: string }) {
     pending: {
       icon: Clock,
       className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-      label: "Pending",
+      label: "等待中",
     },
     transcoding: {
       icon: Loader2,
       className: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-      label: "Transcoding",
+      label: "转码中",
     },
     verifying: {
       icon: Search,
       className: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
-      label: "Verifying",
+      label: "校验中",
     },
     installing: {
       icon: RefreshCw,
       className: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200",
-      label: "Installing",
+      label: "安装中",
     },
     completed: {
       icon: CheckCircle2,
       className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-      label: "Completed",
+      label: "已完成",
     },
     failed: {
       icon: XCircle,
       className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
-      label: "Failed",
+      label: "失败",
     },
     cancelled: {
       icon: XCircle,
       className: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
-      label: "Cancelled",
+      label: "已取消",
     },
   }
 
@@ -179,7 +186,7 @@ function TaskRow({ task }: { task: Task }) {
             className="flex items-center text-[hsl(var(--primary))] hover:underline disabled:opacity-50"
           >
             <RotateCcw className="w-3 h-3 mr-1" />
-            Retry
+            重试
           </button>
         ) : null}
         {task.error_message && (
@@ -225,7 +232,7 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <h1 className="text-2xl font-bold">仪表盘</h1>
         <button
           onClick={() => scanMutation.mutate()}
           disabled={scanMutation.isPending}
@@ -236,29 +243,29 @@ export default function Dashboard() {
           ) : (
             <Search className="w-4 h-4 mr-2" />
           )}
-          Scan for Videos
+          扫描视频
         </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Space Saved"
+          title="已节省空间"
           value={formatBytes(stats?.total_saved_bytes || 0)}
           icon={HardDrive}
-          description={`${stats?.total_processed_files || 0} files processed`}
+          description={`已处理 ${stats?.total_processed_files || 0} 个文件`}
         />
         <StatCard
-          title="Pending"
+          title="等待中"
           value={String(stats?.pending_count || 0)}
           icon={Clock}
         />
         <StatCard
-          title="Completed"
+          title="已完成"
           value={String(stats?.completed_count || 0)}
           icon={CheckCircle2}
         />
         <StatCard
-          title="Failed"
+          title="失败"
           value={String(stats?.failed_count || 0)}
           icon={AlertCircle}
         />
@@ -270,7 +277,7 @@ export default function Dashboard() {
         <div className="px-4 py-3 border-b border-[hsl(var(--border))]">
           <h3 className="font-semibold flex items-center">
             <FileVideo className="w-4 h-4 mr-2" />
-            Task Queue
+            任务队列
           </h3>
         </div>
         <div className="overflow-x-auto">
@@ -278,19 +285,19 @@ export default function Dashboard() {
             <thead className="bg-[hsl(var(--muted))]">
               <tr>
                 <th className="px-4 py-2 text-left text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase">
-                  File
+                  文件
                 </th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase">
-                  Status
+                  状态
                 </th>
                 <th className="px-4 py-2 text-right text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase">
-                  Original
+                  原始大小
                 </th>
                 <th className="px-4 py-2 text-right text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase">
-                  New Size
+                  新大小
                 </th>
                 <th className="px-4 py-2 text-left text-xs font-medium text-[hsl(var(--muted-foreground))] uppercase">
-                  Actions
+                  操作
                 </th>
               </tr>
             </thead>
@@ -304,7 +311,7 @@ export default function Dashboard() {
                     colSpan={5}
                     className="px-4 py-8 text-center text-[hsl(var(--muted-foreground))]"
                   >
-                    No tasks yet. Click "Scan for Videos" to find files.
+                    暂无任务，点击「扫描视频」查找文件
                   </td>
                 </tr>
               )}
