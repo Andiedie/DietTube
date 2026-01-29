@@ -390,7 +390,7 @@ function TaskRow({ task, onError, onSuccess }: { task: Task; onError: (msg: stri
                 取消
               </DialogButton>
               <DialogButton
-                variant="destructive"
+                variant="danger"
                 onClick={() => rollbackMutation.mutate()}
                 disabled={rollbackMutation.isPending}
               >
