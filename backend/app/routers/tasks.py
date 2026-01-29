@@ -5,7 +5,7 @@ import shutil
 from pathlib import Path
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select, func, update
+from sqlalchemy import select, func, update, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 from typing import Optional
@@ -180,6 +180,8 @@ async def retry_task(task_id: int, db: AsyncSession = Depends(get_db)):
             "只有失败、已取消或已回滚的任务才能重试",
             {"task_id": task_id, "current_status": task.status.value},
         )
+
+    await db.execute(delete(TaskLog).where(TaskLog.task_id == task_id))
 
     await db.execute(
         update(Task)

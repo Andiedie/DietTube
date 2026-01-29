@@ -51,8 +51,6 @@ def build_ffmpeg_command(
             "0:a?",
             "-map",
             "0:s?",
-            "-map",
-            "0:t?",
         ]
     )
 
@@ -87,8 +85,6 @@ def build_ffmpeg_command(
     cmd.extend(
         [
             "-c:s",
-            "copy",
-            "-c:t",
             "copy",
         ]
     )
@@ -126,12 +122,13 @@ def parse_progress_line(
         except ValueError:
             pass
     elif key == "speed":
-        speed_match = re.search(r"([\d.]+)x", value)
-        if speed_match:
-            try:
-                accumulator["speed"] = float(speed_match.group(1))
-            except ValueError:
-                pass
+        if value != "N/A":
+            speed_match = re.search(r"([\d.]+)x", value)
+            if speed_match:
+                try:
+                    accumulator["speed"] = float(speed_match.group(1))
+                except ValueError:
+                    pass
     elif key == "out_time_ms":
         try:
             accumulator["current_time"] = int(value) / 1_000_000
@@ -259,8 +256,6 @@ def build_command_preview(
         "0:a?",
         "-map",
         "0:s?",
-        "-map",
-        "0:t?",
         "-c:v",
         "libsvtav1",
         "-preset",
@@ -280,8 +275,6 @@ def build_command_preview(
         "-ac",
         "2",
         "-c:s",
-        "copy",
-        "-c:t",
         "copy",
         "-metadata",
         f"comment={settings.diettube_marker}",
