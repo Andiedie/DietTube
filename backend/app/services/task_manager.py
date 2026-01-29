@@ -34,10 +34,15 @@ class TaskProgress:
 @dataclass
 class TaskManagerState:
     is_running: bool = False
+    is_paused: bool = False
     current_task_id: int | None = None
     current_progress: TaskProgress | None = None
     cancel_event: asyncio.Event = field(default_factory=asyncio.Event)
+    pause_event: asyncio.Event = field(default_factory=asyncio.Event)
     worker_task: asyncio.Task | None = None
+
+    def __post_init__(self):
+        self.pause_event.set()
 
 
 class TaskManager:
@@ -47,6 +52,10 @@ class TaskManager:
     @property
     def is_running(self) -> bool:
         return self._state.is_running
+
+    @property
+    def is_paused(self) -> bool:
+        return self._state.is_paused
 
     @property
     def current_progress(self) -> TaskProgress | None:
@@ -63,6 +72,7 @@ class TaskManager:
     async def stop(self):
         self._state.is_running = False
         self._state.cancel_event.set()
+        self._state.pause_event.set()
         if self._state.worker_task:
             self._state.worker_task.cancel()
             try:
@@ -71,12 +81,26 @@ class TaskManager:
                 pass
         logger.info("TaskManager stopped")
 
+    def pause(self):
+        if not self._state.is_paused:
+            self._state.is_paused = True
+            self._state.pause_event.clear()
+            logger.info("TaskManager paused")
+
+    def resume(self):
+        if self._state.is_paused:
+            self._state.is_paused = False
+            self._state.pause_event.set()
+            logger.info("TaskManager resumed")
+
     async def cancel_current_task(self):
         self._state.cancel_event.set()
 
     async def _worker_loop(self):
         while self._state.is_running:
             try:
+                await self._state.pause_event.wait()
+
                 task = await self._get_next_pending_task()
                 if task is None:
                     await asyncio.sleep(5)

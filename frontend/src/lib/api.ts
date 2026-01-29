@@ -96,6 +96,12 @@ export interface TrashList {
   file_count: number
 }
 
+export interface QueueStatus {
+  is_paused: boolean
+  is_running: boolean
+  has_active_task: boolean
+}
+
 async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, options)
   const data = await response.json()
@@ -139,6 +145,22 @@ export const api = {
       fetchJSON<{ message: string }>(`${API_BASE}/tasks/${taskId}/retry`, {
         method: "POST",
       }),
+    getQueueStatus: () =>
+      fetchJSON<QueueStatus>(`${API_BASE}/tasks/queue/status`),
+    pauseQueue: (immediate = false) =>
+      fetchJSON<{ message: string; is_paused: boolean; interrupted: boolean }>(
+        `${API_BASE}/tasks/queue/pause`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ immediate }),
+        }
+      ),
+    resumeQueue: () =>
+      fetchJSON<{ message: string; is_paused: boolean }>(
+        `${API_BASE}/tasks/queue/resume`,
+        { method: "POST" }
+      ),
   },
   settings: {
     get: () => fetchJSON<Settings>(`${API_BASE}/settings/`),

@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   HardDrive,
@@ -10,10 +11,13 @@ import {
   Search,
   XCircle,
   RotateCcw,
+  Pause,
+  Play,
 } from "lucide-react"
 import { api, type Task, type TaskProgress, ApiRequestError } from "@/lib/api"
 import { formatBytes, formatDuration, cn } from "@/lib/utils"
 import { useToast } from "@/components/Toast"
+import { Dialog, DialogButton } from "@/components/Dialog"
 
 function StatCard({
   title,
@@ -175,9 +179,11 @@ function TaskRow({ task, onError }: { task: Task; onError: (msg: string) => void
       </td>
       <td className="px-4 py-3 text-sm text-right">
         {task.new_size > 0 ? (
-          <span className="text-green-600 dark:text-green-400">
+          <span className={savedPercent >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
             {formatBytes(task.new_size)}
-            <span className="text-xs ml-1">(-{savedPercent.toFixed(1)}%)</span>
+            <span className="text-xs ml-1">
+              ({savedPercent >= 0 ? "-" : "+"}{Math.abs(savedPercent).toFixed(1)}%)
+            </span>
           </span>
         ) : (
           "-"
@@ -210,6 +216,7 @@ function TaskRow({ task, onError }: { task: Task; onError: (msg: string) => void
 export default function Dashboard() {
   const queryClient = useQueryClient()
   const { addToast } = useToast()
+  const [showPauseDialog, setShowPauseDialog] = useState(false)
 
   const { data: stats } = useQuery({
     queryKey: ["stats"],
@@ -227,6 +234,11 @@ export default function Dashboard() {
     queryFn: () => api.tasks.list(undefined, 20),
   })
 
+  const { data: queueStatus } = useQuery({
+    queryKey: ["queueStatus"],
+    queryFn: api.tasks.getQueueStatus,
+  })
+
   const scanMutation = useMutation({
     mutationFn: api.tasks.scan,
     onSuccess: () => {
@@ -240,22 +252,125 @@ export default function Dashboard() {
     },
   })
 
+  const pauseMutation = useMutation({
+    mutationFn: (immediate: boolean) => api.tasks.pauseQueue(immediate),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["queueStatus"] })
+      queryClient.invalidateQueries({ queryKey: ["tasks"] })
+      setShowPauseDialog(false)
+      addToast(data.interrupted ? "队列已暂停，当前任务已中断" : "队列已暂停", "info")
+    },
+    onError: (error) => {
+      const message = error instanceof ApiRequestError ? error.message : "暂停失败"
+      addToast(message, "error")
+    },
+  })
+
+  const resumeMutation = useMutation({
+    mutationFn: api.tasks.resumeQueue,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["queueStatus"] })
+      addToast("队列已继续", "success")
+    },
+    onError: (error) => {
+      const message = error instanceof ApiRequestError ? error.message : "继续失败"
+      addToast(message, "error")
+    },
+  })
+
+  const isPaused = queueStatus?.is_paused ?? false
+  const hasActiveTask = queueStatus?.has_active_task ?? false
+
+  const handlePauseClick = () => {
+    if (hasActiveTask) {
+      setShowPauseDialog(true)
+    } else {
+      pauseMutation.mutate(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
+      <Dialog
+        open={showPauseDialog}
+        onClose={() => setShowPauseDialog(false)}
+        title="暂停队列"
+      >
+        <p className="text-sm text-[hsl(var(--muted-foreground))] mb-4">
+          当前有任务正在转码中，请选择暂停方式：
+        </p>
+        <div className="space-y-2">
+          <button
+            onClick={() => pauseMutation.mutate(false)}
+            disabled={pauseMutation.isPending}
+            className="w-full text-left px-4 py-3 rounded-lg border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))] disabled:opacity-50"
+          >
+            <p className="font-medium">完成后暂停</p>
+            <p className="text-sm text-[hsl(var(--muted-foreground))]">
+              等待当前任务完成后暂停队列
+            </p>
+          </button>
+          <button
+            onClick={() => pauseMutation.mutate(true)}
+            disabled={pauseMutation.isPending}
+            className="w-full text-left px-4 py-3 rounded-lg border border-red-300 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-950 disabled:opacity-50"
+          >
+            <p className="font-medium text-red-600 dark:text-red-400">立即中断</p>
+            <p className="text-sm text-[hsl(var(--muted-foreground))]">
+              中断当前任务并暂停队列（任务将标记为失败）
+            </p>
+          </button>
+        </div>
+        <div className="mt-4 flex justify-end">
+          <DialogButton onClick={() => setShowPauseDialog(false)}>
+            取消
+          </DialogButton>
+        </div>
+      </Dialog>
+
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">仪表盘</h1>
-        <button
-          onClick={() => scanMutation.mutate()}
-          disabled={scanMutation.isPending}
-          className="flex items-center px-4 py-2 bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] rounded-md hover:opacity-90 disabled:opacity-50"
-        >
-          {scanMutation.isPending ? (
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+        <div className="flex items-center gap-2">
+          {isPaused ? (
+            <button
+              onClick={() => resumeMutation.mutate()}
+              disabled={resumeMutation.isPending}
+              className="flex items-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+            >
+              {resumeMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Play className="w-4 h-4 mr-2" />
+              )}
+              继续队列
+            </button>
           ) : (
-            <Search className="w-4 h-4 mr-2" />
+            <button
+              onClick={handlePauseClick}
+              disabled={pauseMutation.isPending}
+              className="flex items-center px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 disabled:opacity-50"
+            >
+              {pauseMutation.isPending ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Pause className="w-4 h-4 mr-2" />
+              )}
+              暂停队列
+            </button>
           )}
-          扫描视频
-        </button>
+          <button
+            onClick={() => scanMutation.mutate()}
+            disabled={scanMutation.isPending}
+            className="flex items-center px-4 py-2 bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] rounded-md hover:opacity-90 disabled:opacity-50"
+          >
+            {scanMutation.isPending ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Search className="w-4 h-4 mr-2" />
+            )}
+            扫描视频
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

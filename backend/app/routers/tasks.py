@@ -175,3 +175,46 @@ async def retry_task(task_id: int, db: AsyncSession = Depends(get_db)):
     await db.commit()
 
     return {"message": "Task queued for retry"}
+
+
+class QueueStatusResponse(BaseModel):
+    is_paused: bool
+    is_running: bool
+    has_active_task: bool
+
+
+@router.get("/queue/status", response_model=QueueStatusResponse)
+async def get_queue_status():
+    return QueueStatusResponse(
+        is_paused=task_manager.is_paused,
+        is_running=task_manager.is_running,
+        has_active_task=task_manager.current_progress is not None,
+    )
+
+
+class PauseRequest(BaseModel):
+    immediate: bool = False
+
+
+@router.post("/queue/pause")
+async def pause_queue(request: PauseRequest | None = None):
+    task_manager.pause()
+    immediate = request.immediate if request else False
+    if immediate and task_manager.current_progress:
+        await task_manager.cancel_current_task()
+        return {
+            "message": "队列已暂停，当前任务已中断",
+            "is_paused": True,
+            "interrupted": True,
+        }
+    return {
+        "message": "队列已暂停，当前任务完成后停止",
+        "is_paused": True,
+        "interrupted": False,
+    }
+
+
+@router.post("/queue/resume")
+async def resume_queue():
+    task_manager.resume()
+    return {"message": "队列已继续", "is_paused": False}
