@@ -35,7 +35,7 @@ class RuntimeSettings:
     video_preset: int = 6
     video_crf: int = 30
     video_film_grain: int = 0
-    audio_bitrate: str = "128k"
+    audio_bitrate: str = "64k"
     max_threads: int = 0
     original_file_strategy: str = "trash"
     archive_dir: str = ""
