@@ -6,12 +6,12 @@ from pathlib import Path
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from sqlalchemy import select, update, func as sql_func
+from sqlalchemy import select, update, func as sql_func, delete
 
 from app.services.settings_service import get_settings
 from app.database import async_session_maker
 from app.models import Task, TaskStatus, ProcessingStats, TaskLog, LogLevel
-from app.services.scanner import get_video_metadata, build_ffprobe_command
+from app.services.scanner import get_video_metadata
 from app.services.transcoder import (
     transcode_file,
     TranscodeProgress,
@@ -139,22 +139,24 @@ class TaskManager:
         source_path = Path(task.source_path)
         temp_output = settings.processing_dir / f"{task.id}_{source_path.name}"
 
+        async with async_session_maker() as session:
+            await session.execute(delete(TaskLog).where(TaskLog.task_id == task.id))
+            await session.commit()
+
         try:
             await self._log(task.id, f"开始处理: {task.relative_path}")
             await self._log(task.id, f"原始文件大小: {task.original_size:,} 字节")
 
-            ffprobe_cmd = build_ffprobe_command(source_path)
-            await self._log(task.id, f"ffprobe: {' '.join(ffprobe_cmd)}")
-
             await self._update_task_status(task.id, TaskStatus.TRANSCODING)
 
             metadata = await get_video_metadata(source_path)
+            if metadata:
+                await self._log_media_info(task.id, metadata)
             original_duration = (
                 float(metadata.get("format", {}).get("duration", 0)) if metadata else 0
             )
 
             await self._update_task_duration(task.id, original_duration)
-            await self._log(task.id, f"视频时长: {original_duration:.1f} 秒")
 
             ffmpeg_cmd = build_ffmpeg_command(
                 source_path, temp_output, original_duration
@@ -330,13 +332,11 @@ class TaskManager:
         logger.info(f"Task {task_id} completed, saved {saved_bytes} bytes")
 
     async def _log(self, task_id: int, message: str, level: LogLevel = LogLevel.INFO):
-        """记录任务执行日志到数据库并广播"""
         async with async_session_maker() as session:
             log_entry = TaskLog(task_id=task_id, level=level, message=message)
             session.add(log_entry)
             await session.commit()
             await session.refresh(log_entry)
-            # 广播日志事件
             log_broadcaster.broadcast(
                 task_id,
                 {
@@ -348,6 +348,11 @@ class TaskManager:
                     else "",
                 },
             )
+
+    async def _log_media_info(self, task_id: int, metadata: dict):
+        import json
+
+        await self._log(task_id, f"ffprobe:\n{json.dumps(metadata, indent=2)}")
 
 
 class LogBroadcaster:
