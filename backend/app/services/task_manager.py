@@ -143,6 +143,9 @@ class TaskManager:
 
         async with async_session_maker() as session:
             await session.execute(delete(TaskLog).where(TaskLog.task_id == task.id))
+            await session.execute(
+                update(Task).where(Task.id == task.id).values(error_message=None)
+            )
             await session.commit()
 
         try:
@@ -354,7 +357,6 @@ class TaskManager:
                     status=TaskStatus.COMPLETED,
                     new_size=new_size,
                     new_duration=new_duration,
-                    error_message=None,
                 )
             )
 
