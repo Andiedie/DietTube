@@ -437,18 +437,7 @@ export default function Dashboard() {
     queryFn: api.tasks.getQueueStatus,
   })
 
-  const scanMutation = useMutation({
-    mutationFn: api.tasks.scan,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks"] })
-      queryClient.invalidateQueries({ queryKey: ["stats"] })
-      addToast("扫描完成", "success")
-    },
-    onError: (error) => {
-      const message = error instanceof ApiRequestError ? error.message : "扫描失败"
-      addToast(message, "error")
-    },
-  })
+  const scanMutation = useMutation({\n    mutationFn: api.tasks.scan,\n    onSuccess: (data) => {\n      queryClient.invalidateQueries({ queryKey: [\"tasks\"] })\n      queryClient.invalidateQueries({ queryKey: [\"stats\"] })\n      addToast(data.message, \"success\")\n    },\n    onError: (error) => {\n      const message = error instanceof ApiRequestError ? error.message : \"扫描失败\"\n      addToast(message, \"error\")\n    },\n  })
 
   const pauseMutation = useMutation({
     mutationFn: (immediate: boolean) => api.tasks.pauseQueue(immediate),

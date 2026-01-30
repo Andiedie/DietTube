@@ -195,7 +195,7 @@ export const api = {
       fetchJSON<TaskProgress | null>(`${API_BASE}/tasks/progress`),
     getStats: () => fetchJSON<Stats>(`${API_BASE}/tasks/stats`),
     scan: () =>
-      fetchJSON<{ message: string }>(`${API_BASE}/tasks/scan`, {
+      fetchJSON<{ message: string; created: number; removed: number }>(`${API_BASE}/tasks/scan`, {
         method: "POST",
       }),
     cancel: (taskId: number) =>

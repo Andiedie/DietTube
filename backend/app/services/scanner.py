@@ -127,15 +127,73 @@ async def create_tasks_for_files(files: list[Path]) -> int:
     return created_count
 
 
-async def run_scan() -> int:
+async def remove_ignored_pending_tasks() -> int:
+    settings = get_settings()
+    source_dir = settings.source_path
+
+    if not settings.scan_ignore_patterns.strip():
+        return 0
+
+    patterns = [
+        p.strip() for p in settings.scan_ignore_patterns.split("\n") if p.strip()
+    ]
+    if not patterns:
+        return 0
+
+    ignore_spec = pathspec.PathSpec.from_lines("gitwildmatch", patterns)
+    removed_count = 0
+
+    from sqlalchemy import select, delete
+
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(Task).where(Task.status == TaskStatus.PENDING)
+        )
+        pending_tasks = result.scalars().all()
+
+        task_ids_to_remove = []
+        for task in pending_tasks:
+            try:
+                file_path = Path(task.source_path)
+                if file_path.is_relative_to(source_dir):
+                    relative_path = file_path.relative_to(source_dir)
+                else:
+                    relative_path = Path(task.relative_path)
+
+                if ignore_spec.match_file(str(relative_path)):
+                    task_ids_to_remove.append(task.id)
+                    logger.info(f"Removing ignored task: {relative_path}")
+            except Exception as e:
+                logger.warning(f"Error checking task {task.id}: {e}")
+
+        if task_ids_to_remove:
+            await session.execute(delete(Task).where(Task.id.in_(task_ids_to_remove)))
+            await session.commit()
+            removed_count = len(task_ids_to_remove)
+
+    return removed_count
+
+
+class ScanResult:
+    def __init__(self, created: int, removed: int):
+        self.created = created
+        self.removed = removed
+
+
+async def run_scan() -> ScanResult:
     logger.info("Starting directory scan...")
+
+    removed = await remove_ignored_pending_tasks()
+    if removed > 0:
+        logger.info(f"Removed {removed} tasks matching ignore patterns")
+
     files = await scan_directory()
     logger.info(f"Found {len(files)} unprocessed video files")
 
     created = await create_tasks_for_files(files)
     logger.info(f"Created {created} new tasks")
 
-    return created
+    return ScanResult(created=created, removed=removed)
 
 
 def get_ignored_files(source_dir: str, scan_ignore_patterns: str) -> list[str]:

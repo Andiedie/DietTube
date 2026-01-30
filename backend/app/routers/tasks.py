@@ -150,8 +150,21 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
 
 @router.post("/scan")
 async def trigger_scan():
-    created = await run_scan()
-    return {"message": f"Scan complete, created {created} new tasks"}
+    result = await run_scan()
+    parts = []
+    if result.created > 0:
+        parts.append(f"添加 {result.created} 个新任务")
+    if result.removed > 0:
+        parts.append(f"移除 {result.removed} 个被忽略的任务")
+    if not parts:
+        message = "扫描完成，无变化"
+    else:
+        message = "扫描完成，" + "，".join(parts)
+    return {
+        "message": message,
+        "created": result.created,
+        "removed": result.removed,
+    }
 
 
 @router.post("/{task_id}/cancel")
