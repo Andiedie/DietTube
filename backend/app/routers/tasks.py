@@ -67,29 +67,119 @@ async def list_tasks(
     offset: int = 0,
     db: AsyncSession = Depends(get_db),
 ):
-    query = select(Task)
     count_query = select(func.count(Task.id))
 
     if status:
         try:
             status_enum = TaskStatus(status)
-            query = query.where(Task.status == status_enum)
             count_query = count_query.where(Task.status == status_enum)
         except ValueError:
             raise ValidationError(f"无效的状态值: {status}", {"status": status})
 
     if search:
         search_pattern = f"%{search}%"
-        query = query.where(Task.relative_path.ilike(search_pattern))
         count_query = count_query.where(Task.relative_path.ilike(search_pattern))
-
-    query = query.order_by(Task.created_at.desc()).offset(offset).limit(limit)
-
-    result = await db.execute(query)
-    tasks = result.scalars().all()
 
     count_result = await db.execute(count_query)
     total = count_result.scalar()
+
+    if status:
+        query = select(Task)
+        status_enum = TaskStatus(status)
+        query = query.where(Task.status == status_enum)
+        if search:
+            query = query.where(Task.relative_path.ilike(f"%{search}%"))
+        query = query.order_by(Task.updated_at.desc()).offset(offset).limit(limit)
+        result = await db.execute(query)
+        tasks = list(result.scalars().all())
+    else:
+        in_progress_statuses = [
+            TaskStatus.SCANNING,
+            TaskStatus.TRANSCODING,
+            TaskStatus.VERIFYING,
+            TaskStatus.INSTALLING,
+        ]
+
+        def build_query(status_filter):
+            q = select(Task).where(status_filter)
+            if search:
+                q = q.where(Task.relative_path.ilike(f"%{search}%"))
+            return q
+
+        in_progress_q = build_query(Task.status.in_(in_progress_statuses)).order_by(
+            Task.updated_at.desc()
+        )
+
+        failed_q = build_query(Task.status == TaskStatus.FAILED).order_by(
+            Task.updated_at.desc()
+        )
+
+        completed_recent_q = (
+            build_query(Task.status == TaskStatus.COMPLETED)
+            .order_by(Task.updated_at.desc())
+            .limit(3)
+        )
+
+        pending_q = build_query(Task.status == TaskStatus.PENDING).order_by(
+            Task.created_at
+        )
+
+        completed_rest_q = (
+            build_query(Task.status == TaskStatus.COMPLETED)
+            .order_by(Task.updated_at.desc())
+            .offset(3)
+        )
+
+        other_q = build_query(
+            Task.status.in_([TaskStatus.CANCELLED, TaskStatus.ROLLED_BACK])
+        ).order_by(Task.updated_at.desc())
+
+        failed_q = (
+            select(Task)
+            .where(Task.status == TaskStatus.FAILED, base_filter)
+            .order_by(Task.updated_at.desc())
+        )
+
+        completed_recent_q = (
+            select(Task)
+            .where(Task.status == TaskStatus.COMPLETED, base_filter)
+            .order_by(Task.updated_at.desc())
+            .limit(3)
+        )
+
+        pending_q = (
+            select(Task)
+            .where(Task.status == TaskStatus.PENDING, base_filter)
+            .order_by(Task.created_at)
+        )
+
+        completed_rest_q = (
+            select(Task)
+            .where(Task.status == TaskStatus.COMPLETED, base_filter)
+            .order_by(Task.updated_at.desc())
+            .offset(3)
+        )
+
+        other_q = (
+            select(Task)
+            .where(
+                Task.status.in_([TaskStatus.CANCELLED, TaskStatus.ROLLED_BACK]),
+                base_filter,
+            )
+            .order_by(Task.updated_at.desc())
+        )
+
+        in_progress = list((await db.execute(in_progress_q)).scalars().all())
+        failed = list((await db.execute(failed_q)).scalars().all())
+        completed_recent = list((await db.execute(completed_recent_q)).scalars().all())
+        pending = list((await db.execute(pending_q)).scalars().all())
+        completed_rest = list((await db.execute(completed_rest_q)).scalars().all())
+        other = list((await db.execute(other_q)).scalars().all())
+
+        all_tasks = (
+            in_progress + failed + completed_recent + pending + completed_rest + other
+        )
+        tasks = all_tasks[offset : offset + limit]
 
     return TaskListResponse(
         tasks=[TaskResponse.model_validate(t) for t in tasks],
