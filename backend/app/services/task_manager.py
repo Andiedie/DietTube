@@ -197,12 +197,22 @@ class TaskManager:
                 target_resolution,
                 source_fps,
             )
-            await self._log(task.id, f"ffmpeg: {' '.join(ffmpeg_cmd)}")
+            full_cmd = " ".join(ffmpeg_cmd)
 
-            await self._log(
-                task.id,
-                f"开始转码 (preset={settings.video_preset}, crf={settings.video_crf})",
-            )
+            ops = []
+            ops.append(f"preset={settings.video_preset}")
+            ops.append(f"crf={settings.video_crf}")
+            if target_resolution:
+                ops.append(f"缩放至{target_resolution[0]}x{target_resolution[1]}")
+            if settings.max_fps > 0 and source_fps > settings.max_fps:
+                ops.append(f"限帧{settings.max_fps}fps")
+            ops_summary = ", ".join(ops)
+
+            await self._log(task.id, f"[COPY:{full_cmd}]转码参数: {ops_summary}")
+
+            import time
+
+            transcode_start = time.time()
 
             def on_progress(p: TranscodeProgress):
                 if self._state.current_progress:
@@ -221,8 +231,9 @@ class TaskManager:
                 source_fps=source_fps,
             )
 
+            transcode_elapsed = time.time() - transcode_start
+
             if not result.success:
-                # 用户主动取消时，将任务重置为等待状态
                 if result.error_message == "Cancelled by user":
                     await self._log(
                         task.id, "任务被用户取消，已重置为等待状态", LogLevel.WARNING
@@ -235,7 +246,10 @@ class TaskManager:
                 await self._fail_task(task.id, result.error_message)
                 return
 
-            await self._log(task.id, "转码完成，开始校验")
+            elapsed_str = (
+                f"{int(transcode_elapsed // 60)}m {int(transcode_elapsed % 60)}s"
+            )
+            await self._log(task.id, f"转码完成，耗时 {elapsed_str}，开始校验")
             await self._update_task_status(task.id, TaskStatus.VERIFYING)
             self._state.current_progress.status = "verifying"
 
@@ -405,7 +419,44 @@ class TaskManager:
     async def _log_media_info(self, task_id: int, metadata: dict):
         import json
 
-        await self._log(task_id, f"ffprobe:\n{json.dumps(metadata, indent=2)}")
+        streams = metadata.get("streams", [])
+        format_info = metadata.get("format", {})
+
+        video_info = None
+        audio_info = None
+        for stream in streams:
+            codec_type = stream.get("codec_type")
+            if codec_type == "video" and not video_info:
+                width = stream.get("width", 0)
+                height = stream.get("height", 0)
+                codec = stream.get("codec_name", "unknown")
+                r_frame_rate = stream.get("r_frame_rate", "0/1")
+                fps = 0.0
+                if "/" in r_frame_rate:
+                    num, denom = r_frame_rate.split("/")
+                    if int(denom) > 0:
+                        fps = round(int(num) / int(denom), 2)
+                video_info = f"{width}x{height} {codec} {fps}fps"
+            elif codec_type == "audio" and not audio_info:
+                codec = stream.get("codec_name", "unknown")
+                channels = stream.get("channels", 0)
+                sample_rate = stream.get("sample_rate", "0")
+                audio_info = f"{codec} {channels}ch {sample_rate}Hz"
+
+        duration = float(format_info.get("duration", 0))
+        duration_str = f"{int(duration // 60)}m {int(duration % 60)}s"
+
+        summary_parts = []
+        if video_info:
+            summary_parts.append(f"视频: {video_info}")
+        if audio_info:
+            summary_parts.append(f"音频: {audio_info}")
+        summary_parts.append(f"时长: {duration_str}")
+
+        summary = " | ".join(summary_parts)
+        raw_json = json.dumps(metadata, ensure_ascii=False)
+
+        await self._log(task_id, f"[COPY:{raw_json}]媒体信息: {summary}")
 
 
 class LogBroadcaster:

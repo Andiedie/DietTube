@@ -17,6 +17,8 @@ import {
   ChevronRight,
   Undo2,
   FileText,
+  Copy,
+  Check,
 } from "lucide-react"
 import { api, type Task, type TaskProgress, type TaskLog, ApiRequestError } from "@/lib/api"
 import { formatBytes, formatDuration, cn } from "@/lib/utils"
@@ -156,6 +158,38 @@ function TaskStatusBadge({ status }: { status: string }) {
         className={cn("w-3 h-3 mr-1", status === "transcoding" && "animate-spin")}
       />
       {config.label}
+    </span>
+  )
+}
+
+function LogMessage({ message }: { message: string }) {
+  const [copied, setCopied] = useState(false)
+
+  const copyMatch = message.match(/^\[COPY:([\s\S]*?)\](.*)$/)
+
+  if (!copyMatch) {
+    return <span>{message}</span>
+  }
+
+  const copyContent = copyMatch[1]
+  const displayText = copyMatch[2]
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(copyContent)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1">
+      <span>{displayText}</span>
+      <button
+        onClick={handleCopy}
+        className="inline-flex items-center px-1.5 py-0.5 text-xs rounded bg-[hsl(var(--muted))] hover:bg-[hsl(var(--accent))] text-[hsl(var(--muted-foreground))]"
+        title="复制完整内容"
+      >
+        {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+      </button>
     </span>
   )
 }
@@ -355,7 +389,7 @@ function TaskRow({ task, onError, onSuccess }: { task: Task; onError: (msg: stri
                     <span className="text-[hsl(var(--muted-foreground))] mr-2">
                       {new Date(log.created_at).toLocaleTimeString()}
                     </span>
-                    {log.message}
+                    <LogMessage message={log.message} />
                   </div>
                 ))}
               </div>
