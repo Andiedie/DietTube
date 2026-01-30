@@ -197,7 +197,7 @@ export const api = {
       search?: string
       limit?: number
       offset?: number
-      sort_by?: "created_at" | "updated_at"
+      sort_by?: "created_at" | "updated_at" | "status_priority"
       sort_order?: "asc" | "desc"
     }) =>
       fetchJSON<TaskListResponse>(

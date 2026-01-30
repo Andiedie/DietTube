@@ -526,7 +526,7 @@ export default function Dashboard() {
           >
             <p className="font-medium text-red-600 dark:text-red-400">立即中断</p>
             <p className="text-sm text-[hsl(var(--muted-foreground))]">
-              中断当前任务并暂停队列（任务将标记为失败）
+              中断当前任务并暂停队列（任务将重新排队）
             </p>
           </button>
         </div>

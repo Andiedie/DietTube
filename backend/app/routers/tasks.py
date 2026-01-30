@@ -6,7 +6,7 @@ from enum import Enum
 from pathlib import Path
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select, func, update
+from sqlalchemy import select, func, update, case
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 from typing import Optional
@@ -68,6 +68,7 @@ class SortOrder(str, Enum):
 class SortBy(str, Enum):
     created_at = "created_at"
     updated_at = "updated_at"
+    status_priority = "status_priority"
 
 
 STATUS_GROUP_MAP = {
@@ -84,6 +85,18 @@ STATUS_GROUP_MAP = {
     "rolled_back": [TaskStatus.ROLLED_BACK],
 }
 
+STATUS_PRIORITY = {
+    TaskStatus.SCANNING: 0,
+    TaskStatus.TRANSCODING: 0,
+    TaskStatus.VERIFYING: 0,
+    TaskStatus.INSTALLING: 0,
+    TaskStatus.FAILED: 1,
+    TaskStatus.PENDING: 2,
+    TaskStatus.COMPLETED: 3,
+    TaskStatus.CANCELLED: 4,
+    TaskStatus.ROLLED_BACK: 5,
+}
+
 
 @router.get("/", response_model=TaskListResponse)
 async def list_tasks(
@@ -91,8 +104,8 @@ async def list_tasks(
     search: Optional[str] = None,
     limit: int = 50,
     offset: int = 0,
-    sort_by: SortBy = SortBy.created_at,
-    sort_order: SortOrder = SortOrder.desc,
+    sort_by: SortBy = SortBy.status_priority,
+    sort_order: SortOrder = SortOrder.asc,
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -101,7 +114,7 @@ async def list_tasks(
     - status: pending | in_progress | completed | failed | cancelled | rolled_back（可逗号分隔多个）
     - search: 按 relative_path 模糊搜索
     - limit/offset: 分页
-    - sort_by: created_at | updated_at
+    - sort_by: created_at | updated_at | status_priority
     - sort_order: asc | desc
     """
     query = select(Task)
@@ -122,11 +135,20 @@ async def list_tasks(
         query = query.where(Task.relative_path.ilike(search_pattern))
         count_query = count_query.where(Task.relative_path.ilike(search_pattern))
 
-    sort_column = Task.created_at if sort_by == SortBy.created_at else Task.updated_at
-    if sort_order == SortOrder.asc:
-        query = query.order_by(sort_column.asc())
+    if sort_by == SortBy.status_priority:
+        priority_order = case(STATUS_PRIORITY, value=Task.status)
+        if sort_order == SortOrder.asc:
+            query = query.order_by(priority_order.asc(), Task.updated_at.desc())
+        else:
+            query = query.order_by(priority_order.desc(), Task.updated_at.asc())
     else:
-        query = query.order_by(sort_column.desc())
+        sort_column = (
+            Task.created_at if sort_by == SortBy.created_at else Task.updated_at
+        )
+        if sort_order == SortOrder.asc:
+            query = query.order_by(sort_column.asc())
+        else:
+            query = query.order_by(sort_column.desc())
 
     query = query.offset(offset).limit(limit)
 
