@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 import pathspec
 
 from app.services.settings_service import get_settings
+from app.services.scan_progress import scan_progress_manager, ScanPhase
 from app.database import async_session_maker
 from app.models import Task, TaskStatus
 
@@ -75,6 +76,9 @@ async def scan_directory() -> list[Path]:
         logger.warning(f"Source directory does not exist: {source_dir}")
         return new_files
 
+    scan_progress_manager.set_phase(ScanPhase.LISTING_FILES)
+
+    video_files: list[Path] = []
     for file_path in source_dir.rglob("*"):
         if not file_path.is_file():
             continue
@@ -87,11 +91,21 @@ async def scan_directory() -> list[Path]:
                 logger.debug(f"Skipping ignored file: {relative_path}")
                 continue
 
+        video_files.append(file_path)
+
+    scan_progress_manager.set_phase(ScanPhase.CHECKING_METADATA)
+
+    for file_path in video_files:
+        relative_path = file_path.relative_to(source_dir)
+        scan_progress_manager.set_current_file(str(relative_path))
+        scan_progress_manager.increment_checked()
+
         metadata = await get_video_metadata(file_path)
         if metadata and is_already_processed(metadata, marker):
             continue
 
         new_files.append(file_path)
+        scan_progress_manager.increment_found()
 
     return new_files
 
@@ -182,18 +196,25 @@ class ScanResult:
 
 async def run_scan() -> ScanResult:
     logger.info("Starting directory scan...")
+    scan_progress_manager.start()
 
-    removed = await remove_ignored_pending_tasks()
-    if removed > 0:
-        logger.info(f"Removed {removed} tasks matching ignore patterns")
+    try:
+        removed = await remove_ignored_pending_tasks()
+        scan_progress_manager.set_tasks_removed(removed)
+        if removed > 0:
+            logger.info(f"Removed {removed} tasks matching ignore patterns")
 
-    files = await scan_directory()
-    logger.info(f"Found {len(files)} unprocessed video files")
+        files = await scan_directory()
+        logger.info(f"Found {len(files)} unprocessed video files")
 
-    created = await create_tasks_for_files(files)
-    logger.info(f"Created {created} new tasks")
+        scan_progress_manager.set_phase(ScanPhase.CREATING_TASKS)
+        created = await create_tasks_for_files(files)
+        scan_progress_manager.set_tasks_created(created)
+        logger.info(f"Created {created} new tasks")
 
-    return ScanResult(created=created, removed=removed)
+        return ScanResult(created=created, removed=removed)
+    finally:
+        scan_progress_manager.finish()
 
 
 def get_ignored_files(source_dir: str, scan_ignore_patterns: str) -> list[str]:

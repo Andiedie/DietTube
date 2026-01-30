@@ -14,6 +14,7 @@ from app.database import get_db
 from app.models import Task, TaskStatus, ProcessingStats, TaskLog
 from app.services.task_manager import task_manager, log_broadcaster
 from app.services.scanner import run_scan
+from app.services.scan_progress import scan_progress_manager
 from app.services.settings_service import get_settings
 from app.errors import NotFoundError, ValidationError, TaskError
 
@@ -165,6 +166,30 @@ async def trigger_scan():
         "created": result.created,
         "removed": result.removed,
     }
+
+
+class ScanProgressResponse(BaseModel):
+    is_scanning: bool
+    phase: str
+    current_file: str
+    files_checked: int
+    files_found: int
+    tasks_created: int
+    tasks_removed: int
+
+
+@router.get("/scan/progress", response_model=ScanProgressResponse)
+async def get_scan_progress():
+    progress = scan_progress_manager.progress
+    return ScanProgressResponse(
+        is_scanning=progress.is_scanning,
+        phase=progress.phase.value,
+        current_file=progress.current_file,
+        files_checked=progress.files_checked,
+        files_found=progress.files_found,
+        tasks_created=progress.tasks_created,
+        tasks_removed=progress.tasks_removed,
+    )
 
 
 @router.post("/{task_id}/cancel")

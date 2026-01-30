@@ -110,6 +110,16 @@ export interface QueueStatus {
   has_active_task: boolean
 }
 
+export interface ScanProgress {
+  is_scanning: boolean
+  phase: string
+  current_file: string
+  files_checked: number
+  files_found: number
+  tasks_created: number
+  tasks_removed: number
+}
+
 export interface TaskLog {
   id: number
   level: "info" | "warning" | "error"
@@ -198,6 +208,8 @@ export const api = {
       fetchJSON<{ message: string; created: number; removed: number }>(`${API_BASE}/tasks/scan`, {
         method: "POST",
       }),
+    getScanProgress: () =>
+      fetchJSON<ScanProgress>(`${API_BASE}/tasks/scan/progress`),
     cancel: (taskId: number) =>
       fetchJSON<{ message: string }>(`${API_BASE}/tasks/${taskId}/cancel`, {
         method: "POST",

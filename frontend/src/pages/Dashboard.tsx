@@ -18,7 +18,7 @@ import {
   Undo2,
   FileText,
 } from "lucide-react"
-import { api, type Task, type TaskProgress, type TaskLog, ApiRequestError } from "@/lib/api"
+import { api, type Task, type TaskProgress, type TaskLog, type ScanProgress, ApiRequestError } from "@/lib/api"
 import { formatBytes, formatDuration, cn } from "@/lib/utils"
 import { useToast } from "@/components/Toast"
 import { Dialog, DialogButton } from "@/components/Dialog"
@@ -437,7 +437,24 @@ export default function Dashboard() {
     queryFn: api.tasks.getQueueStatus,
   })
 
-  const scanMutation = useMutation({\n    mutationFn: api.tasks.scan,\n    onSuccess: (data) => {\n      queryClient.invalidateQueries({ queryKey: [\"tasks\"] })\n      queryClient.invalidateQueries({ queryKey: [\"stats\"] })\n      addToast(data.message, \"success\")\n    },\n    onError: (error) => {\n      const message = error instanceof ApiRequestError ? error.message : \"扫描失败\"\n      addToast(message, \"error\")\n    },\n  })
+  const { data: scanProgress } = useQuery({
+    queryKey: ["scanProgress"],
+    queryFn: api.tasks.getScanProgress,
+    refetchInterval: (query) => query.state.data?.is_scanning ? 500 : false,
+  })
+
+  const scanMutation = useMutation({
+    mutationFn: api.tasks.scan,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] })
+      queryClient.invalidateQueries({ queryKey: ["stats"] })
+      addToast(data.message, "success")
+    },
+    onError: (error) => {
+      const message = error instanceof ApiRequestError ? error.message : "扫描失败"
+      addToast(message, "error")
+    },
+  })
 
   const pauseMutation = useMutation({
     mutationFn: (immediate: boolean) => api.tasks.pauseQueue(immediate),
@@ -559,6 +576,32 @@ export default function Dashboard() {
           </button>
         </div>
       </div>
+
+      {scanProgress?.is_scanning && (
+        <div className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-lg p-4">
+          <div className="flex items-center gap-3">
+            <Loader2 className="w-5 h-5 animate-spin text-[hsl(var(--primary))]" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-sm font-medium">
+                  {scanProgress.phase === "removing_ignored" && "清理被忽略的任务..."}
+                  {scanProgress.phase === "listing_files" && "列出视频文件..."}
+                  {scanProgress.phase === "checking_metadata" && "检查文件元数据..."}
+                  {scanProgress.phase === "creating_tasks" && "创建任务..."}
+                </span>
+                <span className="text-sm text-[hsl(var(--muted-foreground))]">
+                  已检查 {scanProgress.files_checked} 个，发现 {scanProgress.files_found} 个新文件
+                </span>
+              </div>
+              {scanProgress.current_file && (
+                <p className="text-xs text-[hsl(var(--muted-foreground))] truncate">
+                  {scanProgress.current_file}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
