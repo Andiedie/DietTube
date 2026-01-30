@@ -227,6 +227,10 @@ export const api = {
       fetchJSON<{ message: string }>(`${API_BASE}/tasks/${taskId}/cancel`, {
         method: "POST",
       }),
+    skip: (taskId: number) =>
+      fetchJSON<{ message: string }>(`${API_BASE}/tasks/${taskId}/skip`, {
+        method: "POST",
+      }),
     retry: (taskId: number) =>
       fetchJSON<{ message: string }>(`${API_BASE}/tasks/${taskId}/retry`, {
         method: "POST",

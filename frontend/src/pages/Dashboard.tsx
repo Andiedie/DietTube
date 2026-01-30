@@ -21,6 +21,8 @@ import {
   Check,
   Trash2,
   FastForward,
+  SkipForward,
+  StopCircle,
 } from "lucide-react"
 import { api, type Task, type TaskProgress, type TaskLog, ApiRequestError } from "@/lib/api"
 import { formatBytes, formatDuration, cn } from "@/lib/utils"
@@ -330,6 +332,32 @@ function TaskRow({ task, onError, onSuccess }: { task: Task; onError: (msg: stri
     },
   })
 
+  const skipMutation = useMutation({
+    mutationFn: () => api.tasks.skip(task.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] })
+      queryClient.invalidateQueries({ queryKey: ["stats"] })
+      onSuccess("任务已跳过")
+    },
+    onError: (error) => {
+      const message = error instanceof ApiRequestError ? error.message : "跳过失败"
+      onError(message)
+    },
+  })
+
+  const cancelMutation = useMutation({
+    mutationFn: () => api.tasks.cancel(task.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] })
+      queryClient.invalidateQueries({ queryKey: ["stats"] })
+      onSuccess("任务取消请求已发送")
+    },
+    onError: (error) => {
+      const message = error instanceof ApiRequestError ? error.message : "取消失败"
+      onError(message)
+    },
+  })
+
   const savedBytes = task.new_size > 0 ? task.original_size - task.new_size : 0
   const savedPercent =
     task.original_size > 0 ? (savedBytes / task.original_size) * 100 : 0
@@ -384,6 +412,28 @@ function TaskRow({ task, onError, onSuccess }: { task: Task; onError: (msg: stri
                 icon={Undo2}
               >
                 回滚
+              </DropdownItem>
+            )}
+
+            {/* 跳过 - 仅等待中 */}
+            {task.status === "pending" && (
+              <DropdownItem
+                onClick={() => skipMutation.mutate()}
+                disabled={skipMutation.isPending}
+                icon={SkipForward}
+              >
+                跳过
+              </DropdownItem>
+            )}
+
+            {/* 取消 - 扫描中/转码中/验证中 */}
+            {["scanning", "transcoding", "verifying"].includes(task.status) && (
+              <DropdownItem
+                onClick={() => cancelMutation.mutate()}
+                disabled={cancelMutation.isPending}
+                icon={StopCircle}
+              >
+                取消
               </DropdownItem>
             )}
 

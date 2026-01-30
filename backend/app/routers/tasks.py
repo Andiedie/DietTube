@@ -262,12 +262,53 @@ async def get_scan_progress():
 
 
 @router.post("/{task_id}/cancel")
-async def cancel_task(task_id: int):
+async def cancel_task(task_id: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Task).where(Task.id == task_id))
+    task = result.scalar_one_or_none()
+
+    if not task:
+        raise NotFoundError("任务不存在", {"task_id": task_id})
+
+    cancellable_statuses = [
+        TaskStatus.SCANNING,
+        TaskStatus.TRANSCODING,
+        TaskStatus.VERIFYING,
+    ]
+    if task.status not in cancellable_statuses:
+        raise TaskError(
+            "只有扫描中、转码中或验证中的任务才能取消",
+            {"task_id": task_id, "current_status": task.status.value},
+        )
+
     progress = task_manager.current_progress
     if progress and progress.task_id == task_id:
         await task_manager.cancel_current_task()
         return {"message": "Task cancellation requested"}
     raise TaskError("该任务当前未在运行", {"task_id": task_id})
+
+
+@router.post("/{task_id}/skip")
+async def skip_task(task_id: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Task).where(Task.id == task_id))
+    task = result.scalar_one_or_none()
+
+    if not task:
+        raise NotFoundError("任务不存在", {"task_id": task_id})
+
+    if task.status != TaskStatus.PENDING:
+        raise TaskError(
+            "只有等待中的任务才能跳过",
+            {"task_id": task_id, "current_status": task.status.value},
+        )
+
+    await db.execute(
+        update(Task)
+        .where(Task.id == task_id)
+        .values(status=TaskStatus.SKIPPED, error_message="用户手动跳过")
+    )
+    await db.commit()
+
+    return {"message": "任务已跳过"}
 
 
 @router.post("/{task_id}/retry")
