@@ -11,5 +11,5 @@
 
 - **ALWAYS** read `AI_MAINTAINER_GUIDE.md` at the start of a session to understand project context.
 - **ALWAYS** update `AI_MAINTAINER_GUIDE.md` when architectural changes, new patterns, or important decisions are made.
-- **UPDATE** `README.md` when user-facing features, configuration options, or usage instructions change.
+- **UPDATE** `README.md`/`README_CN.md` when user-facing features, configuration options, or usage instructions change.
 - Maintain a habit of reading existing documentation before asking questions or making changes.
