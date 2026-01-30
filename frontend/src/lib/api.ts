@@ -66,6 +66,7 @@ export interface Settings {
   config_dir: string
   max_long_side: number
   max_short_side: number
+  max_fps: number
   start_paused: boolean
   scan_ignore_patterns: string
 }
@@ -83,6 +84,7 @@ export interface SettingsUpdate {
   archive_dir?: string
   max_long_side?: number
   max_short_side?: number
+  max_fps?: number
   start_paused?: boolean
   scan_ignore_patterns?: string
 }

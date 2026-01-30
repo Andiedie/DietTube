@@ -26,6 +26,7 @@ SETTINGS_KEYS = [
     "archive_dir",
     "max_long_side",
     "max_short_side",
+    "max_fps",
     "start_paused",
     "scan_ignore_patterns",
 ]
@@ -45,6 +46,7 @@ class RuntimeSettings:
     archive_dir: str = ""
     max_long_side: int = 0
     max_short_side: int = 0
+    max_fps: int = 30
     start_paused: bool = False
     scan_ignore_patterns: str = ""
 
@@ -121,6 +123,7 @@ class SettingsManager:
             "DIETTUBE_ARCHIVE_DIR": "archive_dir",
             "DIETTUBE_MAX_LONG_SIDE": ("max_long_side", int),
             "DIETTUBE_MAX_SHORT_SIDE": ("max_short_side", int),
+            "DIETTUBE_MAX_FPS": ("max_fps", int),
             "DIETTUBE_START_PAUSED": (
                 "start_paused",
                 lambda x: x.lower() in ("true", "1", "yes"),

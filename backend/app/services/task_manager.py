@@ -159,6 +159,7 @@ class TaskManager:
             )
 
             target_resolution = None
+            source_fps = 0.0
             if metadata:
                 streams = metadata.get("streams", [])
                 for stream in streams:
@@ -177,12 +178,21 @@ class TaskManager:
                                     task.id,
                                     f"缩放: {width}x{height} -> {target_resolution[0]}x{target_resolution[1]}",
                                 )
+                        r_frame_rate = stream.get("r_frame_rate", "0/1")
+                        if "/" in r_frame_rate:
+                            num, denom = r_frame_rate.split("/")
+                            if int(denom) > 0:
+                                source_fps = int(num) / int(denom)
                         break
 
             await self._update_task_duration(task.id, original_duration)
 
             ffmpeg_cmd = build_ffmpeg_command(
-                source_path, temp_output, original_duration, target_resolution
+                source_path,
+                temp_output,
+                original_duration,
+                target_resolution,
+                source_fps,
             )
             await self._log(task.id, f"ffmpeg: {' '.join(ffmpeg_cmd)}")
 
@@ -204,6 +214,8 @@ class TaskManager:
                 original_duration,
                 on_progress=on_progress,
                 cancel_event=self._state.cancel_event,
+                target_resolution=target_resolution,
+                source_fps=source_fps,
             )
 
             if not result.success:

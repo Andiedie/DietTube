@@ -70,6 +70,7 @@ def build_ffmpeg_command(
     output_path: Path,
     duration: float,
     target_resolution: tuple[int, int] | None = None,
+    source_fps: float = 0,
 ) -> list[str]:
     settings = get_settings()
 
@@ -93,8 +94,13 @@ def build_ffmpeg_command(
         ]
     )
 
+    vf_filters = []
     if target_resolution:
-        cmd.extend(["-vf", f"scale={target_resolution[0]}:{target_resolution[1]}"])
+        vf_filters.append(f"scale={target_resolution[0]}:{target_resolution[1]}")
+    if settings.max_fps > 0 and source_fps > settings.max_fps:
+        vf_filters.append(f"fps={settings.max_fps}")
+    if vf_filters:
+        cmd.extend(["-vf", ",".join(vf_filters)])
 
     cmd.extend(
         [
@@ -206,8 +212,12 @@ async def transcode_file(
     duration: float,
     on_progress: Callable[[TranscodeProgress], None] | None = None,
     cancel_event: asyncio.Event | None = None,
+    target_resolution: tuple[int, int] | None = None,
+    source_fps: float = 0,
 ) -> TranscodeResult:
-    cmd = build_ffmpeg_command(input_path, output_path, duration)
+    cmd = build_ffmpeg_command(
+        input_path, output_path, duration, target_resolution, source_fps
+    )
     logger.info(f"Starting transcode: {' '.join(cmd)}")
 
     process = await asyncio.create_subprocess_exec(

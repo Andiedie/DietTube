@@ -546,6 +546,14 @@ export default function Settings() {
             type="number"
             min={0}
           />
+          <SettingInput
+            label="最大帧率"
+            value={formData.max_fps}
+            onChange={(v) => handleChange("max_fps", Number(v))}
+            description="限制输出视频帧率（0=不限制）"
+            type="number"
+            min={0}
+          />
         </div>
       </div>
 
