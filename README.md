@@ -9,6 +9,10 @@
   Built for home NAS and media library scenarios.
 </p>
 
+<p align="center">
+  <a href="README_CN.md">简体中文</a>
+</p>
+
 ## Features
 
 - **AV1 Video Encoding** - SVT-AV1 with 10-bit color depth for excellent quality-to-size ratio
@@ -69,9 +73,14 @@ services:
 | `PGID` | 1000 | Group ID for file permissions |
 | `DIETTUBE_VIDEO_PRESET` | 6 | SVT-AV1 preset (0-13, lower = slower + better) |
 | `DIETTUBE_VIDEO_CRF` | 30 | Quality factor (0-63, lower = better quality) |
+| `DIETTUBE_VIDEO_FILM_GRAIN` | 0 | Synthetic film grain strength (0-50) |
 | `DIETTUBE_AUDIO_BITRATE` | 64k | Opus audio bitrate |
 | `DIETTUBE_MAX_THREADS` | 0 | CPU thread limit (0 = auto) |
 | `DIETTUBE_ORIGINAL_FILE_STRATEGY` | trash | `trash` or `archive` |
+| `DIETTUBE_ARCHIVE_DIR` | | Archive directory path (when strategy is `archive`) |
+| `DIETTUBE_MAX_LONG_SIDE` | 0 | Max pixels for long edge (0 = no limit) |
+| `DIETTUBE_MAX_SHORT_SIDE` | 0 | Max pixels for short edge (0 = no limit) |
+| `DIETTUBE_START_PAUSED` | false | Start with queue paused |
 
 All settings can also be configured via the web interface.
 
