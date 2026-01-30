@@ -208,7 +208,7 @@ class TaskManager:
                 ops.append(f"限帧{settings.max_fps}fps")
             ops_summary = ", ".join(ops)
 
-            await self._log(task.id, f"[COPY:{full_cmd}]转码参数: {ops_summary}")
+            await self._log(task.id, f"[COPY:{full_cmd}[/COPY]转码参数: {ops_summary}")
 
             import time
 
@@ -456,7 +456,7 @@ class TaskManager:
         summary = " | ".join(summary_parts)
         raw_json = json.dumps(metadata, ensure_ascii=False)
 
-        await self._log(task_id, f"[COPY:{raw_json}]媒体信息: {summary}")
+        await self._log(task_id, f"[COPY:{raw_json}[/COPY]媒体信息: {summary}")
 
 
 class LogBroadcaster:

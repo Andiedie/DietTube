@@ -165,7 +165,7 @@ function TaskStatusBadge({ status }: { status: string }) {
 function LogMessage({ message }: { message: string }) {
   const [copied, setCopied] = useState(false)
 
-  const copyMatch = message.match(/^\[COPY:([\s\S]*?)\](.*)$/)
+  const copyMatch = message.match(/^\[COPY:([\s\S]*?)\[\/COPY\](.*)$/)
 
   if (!copyMatch) {
     return <span>{message}</span>
