@@ -18,7 +18,7 @@ import {
   Undo2,
   FileText,
 } from "lucide-react"
-import { api, type Task, type TaskProgress, type TaskLog, type ScanProgress, ApiRequestError } from "@/lib/api"
+import { api, type Task, type TaskProgress, type TaskLog, ApiRequestError } from "@/lib/api"
 import { formatBytes, formatDuration, cn } from "@/lib/utils"
 import { useToast } from "@/components/Toast"
 import { Dialog, DialogButton } from "@/components/Dialog"

@@ -267,6 +267,7 @@ export default function Settings() {
   }
 
   const handleTestPermissions = async () => {
+    if (!formData) return
     setTestingPermissions(true)
     try {
       const results = await api.settings.testPermissions({
@@ -288,6 +289,7 @@ export default function Settings() {
   }
 
   const handleTestIgnorePatterns = async () => {
+    if (!formData) return
     setTestingIgnorePatterns(true)
     try {
       const results = await api.settings.testIgnorePatterns({
