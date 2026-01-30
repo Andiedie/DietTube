@@ -73,8 +73,16 @@ On startup, `perform_recovery()`:
 ### Transcoding Pipeline
 1. Scanner → finds unprocessed videos via metadata marker
 2. Transcoder → FFmpeg with SVT-AV1 (10-bit `yuv420p10le`) + Opus
+   - Resolution scaling via `resolve_resolution()` if `max_long_side`/`max_short_side` are set
+   - Audio downmixed to stereo (`-ac 2`) for Opus compatibility
 3. Verifier → duration/size validation (1% tolerance, min 10KB)
 4. Install → move original to trash/archive, replace with new file
+
+### Queue Pause Behavior
+When queue is paused with "immediate stop":
+- Current task is cancelled and reset to PENDING (not FAILED)
+- Task will be re-processed when queue resumes
+- Log records "任务被用户取消，已重置为等待状态"
 
 ### Processing Marker
 Files are marked as processed by injecting `DietTube-Processed` into the `comment` metadata field.
@@ -114,6 +122,9 @@ All settings are managed via `RuntimeSettings` in `settings_service.py`:
 | `max_threads` | 0 | CPU thread limit (0=auto) |
 | `original_file_strategy` | trash | "trash" or "archive" |
 | `archive_dir` | null | Archive directory (when strategy=archive) |
+| `max_long_side` | 0 | Max pixels for long edge (0=no limit) |
+| `max_short_side` | 0 | Max pixels for short edge (0=no limit) |
+| `start_paused` | false | Start with queue paused |
 | `diettube_marker` | DietTube-Processed | Metadata marker string |
 | `duration_tolerance` | 0.01 | Max duration difference (1%) |
 | `min_file_size` | 10240 | Minimum output size (10KB) |
@@ -137,6 +148,7 @@ Environment variables use `DIETTUBE_` prefix (e.g., `DIETTUBE_VIDEO_CRF=28`).
 - `GET /api/settings/` - Current settings
 - `PUT /api/settings/` - Update settings (persisted to DB)
 - `POST /api/settings/command-preview` - FFmpeg command preview (accepts temp settings)
+- `GET /api/settings/test-permissions` - Test directory read/write permissions
 
 ### Trash
 - `GET /api/trash/` - List trash files
