@@ -67,6 +67,7 @@ export interface Settings {
   max_long_side: number
   max_short_side: number
   max_fps: number
+  min_bitrate_mbps: number
   start_paused: boolean
   scan_ignore_patterns: string
 }
@@ -85,6 +86,7 @@ export interface SettingsUpdate {
   max_long_side?: number
   max_short_side?: number
   max_fps?: number
+  min_bitrate_mbps?: number
   start_paused?: boolean
   scan_ignore_patterns?: string
 }

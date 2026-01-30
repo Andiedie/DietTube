@@ -27,6 +27,7 @@ SETTINGS_KEYS = [
     "max_long_side",
     "max_short_side",
     "max_fps",
+    "min_bitrate_mbps",
     "start_paused",
     "scan_ignore_patterns",
 ]
@@ -47,6 +48,7 @@ class RuntimeSettings:
     max_long_side: int = 0
     max_short_side: int = 0
     max_fps: int = 0
+    min_bitrate_mbps: float = 0
     start_paused: bool = False
     scan_ignore_patterns: str = ""
 
@@ -124,6 +126,7 @@ class SettingsManager:
             "DIETTUBE_MAX_LONG_SIDE": ("max_long_side", int),
             "DIETTUBE_MAX_SHORT_SIDE": ("max_short_side", int),
             "DIETTUBE_MAX_FPS": ("max_fps", int),
+            "DIETTUBE_MIN_BITRATE_MBPS": ("min_bitrate_mbps", float),
             "DIETTUBE_START_PAUSED": (
                 "start_paused",
                 lambda x: x.lower() in ("true", "1", "yes"),
@@ -158,6 +161,8 @@ class SettingsManager:
                                 key,
                                 value.lower() in ("true", "1", "yes"),
                             )
+                        elif isinstance(current_value, float):
+                            setattr(self._settings, key, float(value))
                         elif isinstance(current_value, int):
                             setattr(self._settings, key, int(value))
                         else:
@@ -191,7 +196,11 @@ class SettingsManager:
                     session.add(AppSettings(key=key, value=str_value))
 
                 current_value = getattr(self._settings, key)
-                if isinstance(current_value, int):
+                if isinstance(current_value, bool):
+                    setattr(self._settings, key, bool(value))
+                elif isinstance(current_value, float):
+                    setattr(self._settings, key, float(value))
+                elif isinstance(current_value, int):
                     setattr(self._settings, key, int(value))
                 else:
                     setattr(self._settings, key, str_value)

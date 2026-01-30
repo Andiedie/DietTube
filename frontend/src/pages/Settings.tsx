@@ -377,6 +377,14 @@ export default function Settings() {
           扫描设置
         </h2>
         <div className="space-y-2">
+          <SettingInput
+            label="最低码率 (Mbps)"
+            value={formData.min_bitrate_mbps}
+            onChange={(v) => handleChange("min_bitrate_mbps", Number(v))}
+            description="跳过码率低于此值的视频（0=不跳过）"
+            type="number"
+            min={0}
+          />
           <SettingTextarea
             label="忽略模式"
             value={formData.scan_ignore_patterns}

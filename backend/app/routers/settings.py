@@ -27,6 +27,7 @@ class SettingsResponse(BaseModel):
     max_long_side: int
     max_short_side: int
     max_fps: int
+    min_bitrate_mbps: float
     start_paused: bool
     scan_ignore_patterns: str
 
@@ -45,6 +46,7 @@ class SettingsUpdate(BaseModel):
     max_long_side: Optional[int] = None
     max_short_side: Optional[int] = None
     max_fps: Optional[int] = None
+    min_bitrate_mbps: Optional[float] = None
     start_paused: Optional[bool] = None
     scan_ignore_patterns: Optional[str] = None
 
@@ -70,6 +72,7 @@ async def get_current_settings():
         max_long_side=settings.max_long_side,
         max_short_side=settings.max_short_side,
         max_fps=settings.max_fps,
+        min_bitrate_mbps=settings.min_bitrate_mbps,
         start_paused=settings.start_paused,
         scan_ignore_patterns=settings.scan_ignore_patterns,
     )
@@ -97,6 +100,7 @@ async def update_settings(updates: SettingsUpdate):
         max_long_side=settings.max_long_side,
         max_short_side=settings.max_short_side,
         max_fps=settings.max_fps,
+        min_bitrate_mbps=settings.min_bitrate_mbps,
         start_paused=settings.start_paused,
         scan_ignore_patterns=settings.scan_ignore_patterns,
     )

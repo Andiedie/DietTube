@@ -56,11 +56,41 @@ def is_already_processed(metadata: dict, marker: str) -> bool:
     return marker in comment
 
 
+def get_video_bitrate_mbps(metadata: dict) -> float | None:
+    if not metadata or "format" not in metadata:
+        return None
+
+    format_info = metadata.get("format", {})
+    bit_rate_str = format_info.get("bit_rate")
+    if bit_rate_str:
+        try:
+            return int(bit_rate_str) / 1_000_000
+        except (ValueError, TypeError):
+            pass
+
+    return None
+
+
+def is_low_bitrate(metadata: dict | None, min_bitrate_mbps: float) -> bool:
+    if min_bitrate_mbps <= 0:
+        return False
+
+    if metadata is None:
+        return False
+
+    bitrate_mbps = get_video_bitrate_mbps(metadata)
+    if bitrate_mbps is None:
+        return False
+
+    return bitrate_mbps < min_bitrate_mbps
+
+
 async def scan_directory() -> list[Path]:
     settings = get_settings()
     source_dir = settings.source_path
     extensions = settings.video_extensions
     marker = settings.diettube_marker
+    min_bitrate_mbps = settings.min_bitrate_mbps
 
     ignore_spec = None
     if settings.scan_ignore_patterns.strip():
@@ -102,6 +132,10 @@ async def scan_directory() -> list[Path]:
 
         metadata = await get_video_metadata(file_path)
         if metadata and is_already_processed(metadata, marker):
+            continue
+
+        if is_low_bitrate(metadata, min_bitrate_mbps):
+            logger.debug(f"Skipping low bitrate file: {relative_path}")
             continue
 
         new_files.append(file_path)

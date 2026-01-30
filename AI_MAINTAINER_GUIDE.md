@@ -127,6 +127,7 @@ All settings are managed via `RuntimeSettings` in `settings_service.py`:
 | `archive_dir` | null | Archive directory (when strategy=archive) |
 | `max_long_side` | 0 | Max pixels for long edge (0=no limit) |
 | `max_short_side` | 0 | Max pixels for short edge (0=no limit) |
+| `min_bitrate_mbps` | 0 | Skip videos with bitrate below this (Mbps, 0=disabled) |
 | `start_paused` | false | Start with queue paused |
 | `scan_ignore_patterns` | "" | Gitignore-style patterns to skip during scan (newline-separated) |
 | `diettube_marker` | DietTube-Processed | Metadata marker string |

@@ -80,6 +80,7 @@ services:
 | `DIETTUBE_ARCHIVE_DIR` | | Archive directory path (when strategy is `archive`) |
 | `DIETTUBE_MAX_LONG_SIDE` | 0 | Max pixels for long edge (0 = no limit) |
 | `DIETTUBE_MAX_SHORT_SIDE` | 0 | Max pixels for short edge (0 = no limit) |
+| `DIETTUBE_MIN_BITRATE_MBPS` | 0 | Skip videos with bitrate below this (Mbps, 0 = disabled) |
 | `DIETTUBE_START_PAUSED` | false | Start with queue paused |
 | `DIETTUBE_SCAN_IGNORE_PATTERNS` | | Newline-separated gitignore-style patterns to skip during scan |
 
