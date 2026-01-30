@@ -439,23 +439,26 @@ export default function Dashboard() {
     queryFn: api.tasks.getQueueStatus,
   })
 
-  const { data: scanProgress } = useQuery({
-    queryKey: ["scanProgress"],
-    queryFn: api.tasks.getScanProgress,
-    refetchInterval: (query) => query.state.data?.is_scanning ? 500 : false,
-  })
-
   const scanMutation = useMutation({
     mutationFn: api.tasks.scan,
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] })
       queryClient.invalidateQueries({ queryKey: ["stats"] })
+      queryClient.invalidateQueries({ queryKey: ["scanProgress"] })
       addToast(data.message, "success")
     },
     onError: (error) => {
+      queryClient.invalidateQueries({ queryKey: ["scanProgress"] })
       const message = error instanceof ApiRequestError ? error.message : "扫描失败"
       addToast(message, "error")
     },
+  })
+
+  const { data: scanProgress } = useQuery({
+    queryKey: ["scanProgress"],
+    queryFn: api.tasks.getScanProgress,
+    refetchInterval: (query) => 
+      scanMutation.isPending || query.state.data?.is_scanning ? 500 : false,
   })
 
   const pauseMutation = useMutation({
