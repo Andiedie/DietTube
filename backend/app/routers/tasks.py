@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 from app.database import get_db
-from app.models import Task, TaskStatus, ProcessingStats, TaskLog
+from app.models import Task, TaskStatus, ProcessingStats, TaskLog, LogLevel
 from app.services.task_manager import task_manager, log_broadcaster
 from app.services.scanner import run_scan
 from app.services.scan_progress import scan_progress_manager
@@ -407,6 +407,11 @@ async def rollback_task(task_id: int, db: AsyncSession = Depends(get_db)):
     # 更新任务状态为已回滚
     await db.execute(
         update(Task).where(Task.id == task_id).values(status=TaskStatus.ROLLED_BACK)
+    )
+    db.add(
+        TaskLog(
+            task_id=task_id, level=LogLevel.INFO, message="任务已回滚，原始文件已恢复"
+        )
     )
     await db.commit()
 
