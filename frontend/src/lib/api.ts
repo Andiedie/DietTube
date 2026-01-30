@@ -64,6 +64,8 @@ export interface Settings {
   source_dir: string
   temp_dir: string
   config_dir: string
+  max_long_side: number
+  max_short_side: number
 }
 
 export interface SettingsUpdate {
@@ -77,6 +79,8 @@ export interface SettingsUpdate {
   max_threads?: number
   original_file_strategy?: string
   archive_dir?: string
+  max_long_side?: number
+  max_short_side?: number
 }
 
 export interface TrashInfo {

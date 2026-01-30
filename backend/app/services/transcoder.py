@@ -12,6 +12,42 @@ from app.services.settings_service import get_settings
 logger = logging.getLogger(__name__)
 
 
+def resolve_resolution(
+    origin_w: int,
+    origin_h: int,
+    max_long_side: int,
+    max_short_side: int,
+) -> tuple[int, int] | None:
+    if max_long_side <= 0 and max_short_side <= 0:
+        return None
+
+    w, h = float(origin_w), float(origin_h)
+    ratio = w / h
+
+    if w > h:
+        if max_long_side > 0 and w > max_long_side:
+            w = max_long_side
+            h = w / ratio
+        if max_short_side > 0 and h > max_short_side:
+            h = max_short_side
+            w = h * ratio
+    else:
+        if max_long_side > 0 and h > max_long_side:
+            h = max_long_side
+            w = h * ratio
+        if max_short_side > 0 and w > max_short_side:
+            w = max_short_side
+            h = w / ratio
+
+    new_w = int(w // 2 * 2)
+    new_h = int(h // 2 * 2)
+
+    if new_w == origin_w and new_h == origin_h:
+        return None
+
+    return (new_w, new_h)
+
+
 @dataclass
 class TranscodeProgress:
     fps: float = 0.0
@@ -30,7 +66,10 @@ class TranscodeResult:
 
 
 def build_ffmpeg_command(
-    input_path: Path, output_path: Path, duration: float
+    input_path: Path,
+    output_path: Path,
+    duration: float,
+    target_resolution: tuple[int, int] | None = None,
 ) -> list[str]:
     settings = get_settings()
 
@@ -53,6 +92,9 @@ def build_ffmpeg_command(
             "0:s?",
         ]
     )
+
+    if target_resolution:
+        cmd.extend(["-vf", f"scale={target_resolution[0]}:{target_resolution[1]}"])
 
     cmd.extend(
         [

@@ -351,6 +351,22 @@ export default function Settings() {
             min={0}
             max={50}
           />
+          <SettingInput
+            label="最大长边"
+            value={formData.max_long_side}
+            onChange={(v) => handleChange("max_long_side", Number(v))}
+            description="限制输出视频长边像素（0=不限制）"
+            type="number"
+            min={0}
+          />
+          <SettingInput
+            label="最大短边"
+            value={formData.max_short_side}
+            onChange={(v) => handleChange("max_short_side", Number(v))}
+            description="限制输出视频短边像素（0=不限制）"
+            type="number"
+            min={0}
+          />
         </div>
       </div>
 

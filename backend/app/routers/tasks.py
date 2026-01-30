@@ -251,6 +251,7 @@ async def rollback_task(task_id: int, db: AsyncSession = Depends(get_db)):
 
     settings = get_settings()
     source_path = Path(task.source_path)
+    transcoded_path = source_path.with_suffix(".mkv")
     relative_path = Path(task.relative_path)
 
     # 查找原始文件：先检查 trash，再检查 archive
@@ -270,9 +271,9 @@ async def rollback_task(task_id: int, db: AsyncSession = Depends(get_db)):
             {"searched_paths": [str(p) for p in backup_locations]},
         )
 
-    # 删除转码后的文件（当前在 source_path 位置）
-    if source_path.exists():
-        source_path.unlink()
+    # 删除转码后的文件
+    if transcoded_path.exists():
+        transcoded_path.unlink()
 
     # 恢复原始文件
     source_path.parent.mkdir(parents=True, exist_ok=True)

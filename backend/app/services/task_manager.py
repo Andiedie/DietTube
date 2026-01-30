@@ -16,6 +16,7 @@ from app.services.transcoder import (
     transcode_file,
     TranscodeProgress,
     build_ffmpeg_command,
+    resolve_resolution,
 )
 from app.services.verifier import verify_output
 
@@ -137,7 +138,8 @@ class TaskManager:
         )
 
         source_path = Path(task.source_path)
-        temp_output = settings.processing_dir / f"{task.id}_{source_path.name}"
+        output_path = source_path.with_suffix(".mkv")
+        temp_output = settings.processing_dir / f"{task.id}_{source_path.stem}.mkv"
 
         async with async_session_maker() as session:
             await session.execute(delete(TaskLog).where(TaskLog.task_id == task.id))
@@ -156,10 +158,31 @@ class TaskManager:
                 float(metadata.get("format", {}).get("duration", 0)) if metadata else 0
             )
 
+            target_resolution = None
+            if metadata:
+                streams = metadata.get("streams", [])
+                for stream in streams:
+                    if stream.get("codec_type") == "video":
+                        width = stream.get("width", 0)
+                        height = stream.get("height", 0)
+                        if width > 0 and height > 0:
+                            target_resolution = resolve_resolution(
+                                width,
+                                height,
+                                settings.max_long_side,
+                                settings.max_short_side,
+                            )
+                            if target_resolution:
+                                await self._log(
+                                    task.id,
+                                    f"缩放: {width}x{height} -> {target_resolution[0]}x{target_resolution[1]}",
+                                )
+                        break
+
             await self._update_task_duration(task.id, original_duration)
 
             ffmpeg_cmd = build_ffmpeg_command(
-                source_path, temp_output, original_duration
+                source_path, temp_output, original_duration, target_resolution
             )
             await self._log(task.id, f"ffmpeg: {' '.join(ffmpeg_cmd)}")
 
@@ -217,7 +240,7 @@ class TaskManager:
             )
             await self._handle_original_file(source_path, task.relative_path)
 
-            shutil.move(str(temp_output), str(source_path))
+            shutil.move(str(temp_output), str(output_path))
 
             saved_bytes = task.original_size - verify_result.new_size
             saved_percent = (

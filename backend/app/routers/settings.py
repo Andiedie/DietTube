@@ -23,6 +23,8 @@ class SettingsResponse(BaseModel):
     max_threads: int
     original_file_strategy: str
     archive_dir: str
+    max_long_side: int
+    max_short_side: int
 
 
 class SettingsUpdate(BaseModel):
@@ -36,6 +38,8 @@ class SettingsUpdate(BaseModel):
     max_threads: Optional[int] = None
     original_file_strategy: Optional[str] = None
     archive_dir: Optional[str] = None
+    max_long_side: Optional[int] = None
+    max_short_side: Optional[int] = None
 
 
 class CommandPreviewResponse(BaseModel):
@@ -56,6 +60,8 @@ async def get_current_settings():
         max_threads=settings.max_threads,
         original_file_strategy=settings.original_file_strategy,
         archive_dir=settings.archive_dir or "",
+        max_long_side=settings.max_long_side,
+        max_short_side=settings.max_short_side,
     )
 
 
@@ -78,6 +84,8 @@ async def update_settings(updates: SettingsUpdate):
         max_threads=settings.max_threads,
         original_file_strategy=settings.original_file_strategy,
         archive_dir=settings.archive_dir or "",
+        max_long_side=settings.max_long_side,
+        max_short_side=settings.max_short_side,
     )
 
 

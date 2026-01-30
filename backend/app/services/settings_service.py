@@ -24,6 +24,8 @@ SETTINGS_KEYS = [
     "max_threads",
     "original_file_strategy",
     "archive_dir",
+    "max_long_side",
+    "max_short_side",
 ]
 
 
@@ -39,6 +41,8 @@ class RuntimeSettings:
     max_threads: int = 0
     original_file_strategy: str = "trash"
     archive_dir: str = ""
+    max_long_side: int = 0
+    max_short_side: int = 0
 
     diettube_marker: str = field(default="DietTube-Processed", repr=False)
     duration_tolerance: float = field(default=0.01, repr=False)
@@ -111,6 +115,8 @@ class SettingsManager:
             "DIETTUBE_MAX_THREADS": ("max_threads", int),
             "DIETTUBE_ORIGINAL_FILE_STRATEGY": "original_file_strategy",
             "DIETTUBE_ARCHIVE_DIR": "archive_dir",
+            "DIETTUBE_MAX_LONG_SIDE": ("max_long_side", int),
+            "DIETTUBE_MAX_SHORT_SIDE": ("max_short_side", int),
         }
 
         for env_key, target in env_mapping.items():
