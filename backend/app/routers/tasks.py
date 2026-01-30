@@ -134,41 +134,6 @@ async def list_tasks(
             Task.status.in_([TaskStatus.CANCELLED, TaskStatus.ROLLED_BACK])
         ).order_by(Task.updated_at.desc())
 
-        failed_q = (
-            select(Task)
-            .where(Task.status == TaskStatus.FAILED, base_filter)
-            .order_by(Task.updated_at.desc())
-        )
-
-        completed_recent_q = (
-            select(Task)
-            .where(Task.status == TaskStatus.COMPLETED, base_filter)
-            .order_by(Task.updated_at.desc())
-            .limit(3)
-        )
-
-        pending_q = (
-            select(Task)
-            .where(Task.status == TaskStatus.PENDING, base_filter)
-            .order_by(Task.created_at)
-        )
-
-        completed_rest_q = (
-            select(Task)
-            .where(Task.status == TaskStatus.COMPLETED, base_filter)
-            .order_by(Task.updated_at.desc())
-            .offset(3)
-        )
-
-        other_q = (
-            select(Task)
-            .where(
-                Task.status.in_([TaskStatus.CANCELLED, TaskStatus.ROLLED_BACK]),
-                base_filter,
-            )
-            .order_by(Task.updated_at.desc())
-        )
-
         in_progress = list((await db.execute(in_progress_q)).scalars().all())
         failed = list((await db.execute(failed_q)).scalars().all())
         completed_recent = list((await db.execute(completed_recent_q)).scalars().all())
