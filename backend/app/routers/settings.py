@@ -25,6 +25,7 @@ class SettingsResponse(BaseModel):
     archive_dir: str
     max_long_side: int
     max_short_side: int
+    start_paused: bool
 
 
 class SettingsUpdate(BaseModel):
@@ -40,6 +41,7 @@ class SettingsUpdate(BaseModel):
     archive_dir: Optional[str] = None
     max_long_side: Optional[int] = None
     max_short_side: Optional[int] = None
+    start_paused: Optional[bool] = None
 
 
 class CommandPreviewResponse(BaseModel):
@@ -62,6 +64,7 @@ async def get_current_settings():
         archive_dir=settings.archive_dir or "",
         max_long_side=settings.max_long_side,
         max_short_side=settings.max_short_side,
+        start_paused=settings.start_paused,
     )
 
 
@@ -86,6 +89,7 @@ async def update_settings(updates: SettingsUpdate):
         archive_dir=settings.archive_dir or "",
         max_long_side=settings.max_long_side,
         max_short_side=settings.max_short_side,
+        start_paused=settings.start_paused,
     )
 
 

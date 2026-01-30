@@ -207,6 +207,13 @@ class TaskManager:
             )
 
             if not result.success:
+                # 用户主动取消时，将任务重置为等待状态
+                if result.error_message == "Cancelled by user":
+                    await self._log(
+                        task.id, "任务被用户取消，已重置为等待状态", LogLevel.WARNING
+                    )
+                    await self._reset_task_to_pending(task.id)
+                    return
                 await self._log(
                     task.id, f"转码失败: {result.error_message}", LogLevel.ERROR
                 )
@@ -311,6 +318,14 @@ class TaskManager:
             )
             await session.commit()
         logger.error(f"Task {task_id} failed: {error_message}")
+
+    async def _reset_task_to_pending(self, task_id: int):
+        async with async_session_maker() as session:
+            await session.execute(
+                update(Task).where(Task.id == task_id).values(status=TaskStatus.PENDING)
+            )
+            await session.commit()
+        logger.info(f"Task {task_id} reset to pending")
 
     async def _complete_task(
         self,

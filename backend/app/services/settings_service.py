@@ -26,6 +26,7 @@ SETTINGS_KEYS = [
     "archive_dir",
     "max_long_side",
     "max_short_side",
+    "start_paused",
 ]
 
 
@@ -43,6 +44,7 @@ class RuntimeSettings:
     archive_dir: str = ""
     max_long_side: int = 0
     max_short_side: int = 0
+    start_paused: bool = False
 
     diettube_marker: str = field(default="DietTube-Processed", repr=False)
     duration_tolerance: float = field(default=0.01, repr=False)
@@ -117,6 +119,10 @@ class SettingsManager:
             "DIETTUBE_ARCHIVE_DIR": "archive_dir",
             "DIETTUBE_MAX_LONG_SIDE": ("max_long_side", int),
             "DIETTUBE_MAX_SHORT_SIDE": ("max_short_side", int),
+            "DIETTUBE_START_PAUSED": (
+                "start_paused",
+                lambda x: x.lower() in ("true", "1", "yes"),
+            ),
         }
 
         for env_key, target in env_mapping.items():
@@ -140,7 +146,13 @@ class SettingsManager:
                     if key in db_settings:
                         value = db_settings[key]
                         current_value = getattr(self._settings, key)
-                        if isinstance(current_value, int):
+                        if isinstance(current_value, bool):
+                            setattr(
+                                self._settings,
+                                key,
+                                value.lower() in ("true", "1", "yes"),
+                            )
+                        elif isinstance(current_value, int):
                             setattr(self._settings, key, int(value))
                         else:
                             setattr(self._settings, key, value)

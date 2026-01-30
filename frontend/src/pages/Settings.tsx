@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   XCircle,
   ShieldCheck,
+  Power,
 } from "lucide-react"
 import {
   api,
@@ -411,6 +412,35 @@ export default function Settings() {
               description="原始文件的归档位置"
             />
           )}
+        </div>
+      </div>
+
+      <div className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-lg p-6">
+        <h2 className="text-lg font-semibold mb-4 flex items-center">
+          <Power className="w-5 h-5 mr-2" />
+          启动设置
+        </h2>
+        <div className="flex items-center justify-between py-3">
+          <div className="flex-1">
+            <p className="font-medium">启动时暂停队列</p>
+            <p className="text-sm text-[hsl(var(--muted-foreground))]">
+              启动时自动暂停任务队列，需要手动恢复才会开始处理
+            </p>
+          </div>
+          <button
+            onClick={() => handleChange("start_paused", !formData.start_paused)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+              formData.start_paused
+                ? "bg-[hsl(var(--primary))]"
+                : "bg-[hsl(var(--muted))]"
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                formData.start_paused ? "translate-x-6" : "translate-x-1"
+              }`}
+            />
+          </button>
         </div>
       </div>
 

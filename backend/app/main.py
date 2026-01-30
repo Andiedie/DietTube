@@ -43,7 +43,11 @@ async def lifespan(app: FastAPI):
     logger.info("Recovery completed")
 
     task_manager.start()
-    logger.info("Task manager started")
+    if get_settings().start_paused:
+        task_manager.pause()
+        logger.info("Task manager started (paused)")
+    else:
+        logger.info("Task manager started")
 
     yield
 

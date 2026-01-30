@@ -66,6 +66,7 @@ export interface Settings {
   config_dir: string
   max_long_side: number
   max_short_side: number
+  start_paused: boolean
 }
 
 export interface SettingsUpdate {
@@ -81,6 +82,7 @@ export interface SettingsUpdate {
   archive_dir?: string
   max_long_side?: number
   max_short_side?: number
+  start_paused?: boolean
 }
 
 export interface TrashInfo {
