@@ -31,7 +31,7 @@ COPY backend/ ./
 
 COPY --from=frontend-builder /app/backend/static ./static
 
-COPY docker-entrypoint.sh /docker-entrypoint.sh
+COPY docker/docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
 ENV DIETTUBE_SOURCE_DIR=/source

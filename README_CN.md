@@ -108,7 +108,7 @@ git clone https://github.com/Andiedie/DietTube.git
 cd DietTube
 
 # 构建 Docker 镜像
-docker build -t diettube .
+docker build -t diettube -f docker/Dockerfile .
 
 # 或本地开发运行
 cd backend && ./dev.sh    # 终端 1

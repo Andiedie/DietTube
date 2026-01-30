@@ -24,11 +24,11 @@ DietTube/
 │   │   ├── errors.py            # Unified error handling (AppError, NotFoundError, etc.)
 │   │   ├── routers/             # API endpoints
 │   │   │   ├── tasks.py         # Task CRUD, scan, progress, queue pause/resume
-│   │   │   ├── settings.py      # Settings read/update, command preview
+│   │   │   ├── settings.py      # Settings read/update, command preview, permission test
 │   │   │   └── trash.py         # Trash management
 │   │   └── services/            # Business logic
 │   │       ├── scanner.py       # Directory scanning, metadata check
-│   │       ├── transcoder.py    # FFmpeg integration, progress parsing
+│   │       ├── transcoder.py    # FFmpeg integration, progress parsing, resolution scaling
 │   │       ├── verifier.py      # Output validation
 │   │       ├── task_manager.py  # Async task queue, pause/resume, in-memory progress
 │   │       ├── recovery.py      # Startup recovery logic
@@ -42,9 +42,12 @@ DietTube/
 │   │   ├── components/          # Toast, Dialog, Pagination, etc.
 │   │   └── lib/                 # API client, utilities
 │   └── package.json
-├── Dockerfile                   # Multi-stage build with PUID/PGID
-├── docker-entrypoint.sh         # User permission handling
-└── docker-compose.yml           # Example deployment
+├── docker/
+│   ├── Dockerfile               # Multi-stage build with PUID/PGID
+│   └── docker-entrypoint.sh     # User permission handling
+└── .github/
+    └── workflows/
+        └── docker.yml           # CI/CD for Docker image build and push
 ```
 
 ## Key Design Decisions
@@ -221,7 +224,7 @@ cd frontend && pnpm dev
 
 ### Building Docker Image
 ```bash
-docker build -t diettube .
+docker build -t diettube -f docker/Dockerfile .
 docker run -p 8000:8000 \
   -e PUID=1000 -e PGID=1000 \
   -v ./data/source:/source \

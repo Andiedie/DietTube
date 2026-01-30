@@ -108,7 +108,7 @@ git clone https://github.com/Andiedie/DietTube.git
 cd DietTube
 
 # Build Docker image
-docker build -t diettube .
+docker build -t diettube -f docker/Dockerfile .
 
 # Or run locally for development
 cd backend && ./dev.sh    # Terminal 1
