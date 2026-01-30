@@ -128,6 +128,7 @@ All settings are managed via `RuntimeSettings` in `settings_service.py`:
 | `max_long_side` | 0 | Max pixels for long edge (0=no limit) |
 | `max_short_side` | 0 | Max pixels for short edge (0=no limit) |
 | `start_paused` | false | Start with queue paused |
+| `scan_ignore_patterns` | "" | Gitignore-style patterns to skip during scan (newline-separated) |
 | `diettube_marker` | DietTube-Processed | Metadata marker string |
 | `duration_tolerance` | 0.01 | Max duration difference (1%) |
 | `min_file_size` | 10240 | Minimum output size (10KB) |

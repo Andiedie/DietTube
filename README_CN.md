@@ -81,6 +81,7 @@ services:
 | `DIETTUBE_MAX_LONG_SIDE` | 0 | 长边最大像素（0 = 不限制） |
 | `DIETTUBE_MAX_SHORT_SIDE` | 0 | 短边最大像素（0 = 不限制） |
 | `DIETTUBE_START_PAUSED` | false | 启动时暂停队列 |
+| `DIETTUBE_SCAN_IGNORE_PATTERNS` | | 扫描时忽略的文件/目录模式（每行一个，支持 gitignore 语法） |
 
 所有设置也可以通过 Web 界面进行配置。
 

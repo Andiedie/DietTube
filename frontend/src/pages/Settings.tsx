@@ -11,15 +11,18 @@ import {
   ShieldCheck,
   Power,
   FolderOpen,
+  Eye,
 } from "lucide-react"
 import {
   api,
   type Settings as SettingsType,
   type PermissionTestResponse,
+  type IgnorePatternsTestResponse,
   ApiRequestError,
 } from "@/lib/api"
 import { useToast } from "@/components/Toast"
 import { DirectoryPicker } from "@/components/DirectoryPicker"
+import { Dialog } from "@/components/Dialog"
 
 function SettingInput({
   label,
@@ -100,6 +103,42 @@ function SettingSelect({
   )
 }
 
+function SettingTextarea({
+  label,
+  value,
+  onChange,
+  description,
+  placeholder,
+  rows = 4,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  description?: string
+  placeholder?: string
+  rows?: number
+}) {
+  return (
+    <div className="py-3 border-b border-[hsl(var(--border))] last:border-0">
+      <div className="mb-2">
+        <p className="font-medium">{label}</p>
+        {description && (
+          <p className="text-sm text-[hsl(var(--muted-foreground))]">
+            {description}
+          </p>
+        )}
+      </div>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        rows={rows}
+        className="w-full px-3 py-2 rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[hsl(var(--primary))] resize-y"
+      />
+    </div>
+  )
+}
+
 function SettingDirectory({
   label,
   value,
@@ -156,6 +195,10 @@ export default function Settings() {
   const [permissionResults, setPermissionResults] =
     useState<PermissionTestResponse | null>(null)
   const [testingPermissions, setTestingPermissions] = useState(false)
+  const [ignoredFilesResult, setIgnoredFilesResult] =
+    useState<IgnorePatternsTestResponse | null>(null)
+  const [testingIgnorePatterns, setTestingIgnorePatterns] = useState(false)
+  const [ignoredFilesDialogOpen, setIgnoredFilesDialogOpen] = useState(false)
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ["settings"],
@@ -226,7 +269,13 @@ export default function Settings() {
   const handleTestPermissions = async () => {
     setTestingPermissions(true)
     try {
-      const results = await api.settings.testPermissions()
+      const results = await api.settings.testPermissions({
+        source_dir: formData.source_dir,
+        temp_dir: formData.temp_dir,
+        config_dir: formData.config_dir,
+        original_file_strategy: formData.original_file_strategy,
+        archive_dir: formData.archive_dir,
+      })
       setPermissionResults(results)
       const allOk = results.source.writable && results.temp.writable && results.config.writable &&
         (!results.archive || results.archive.writable)
@@ -235,6 +284,22 @@ export default function Settings() {
       addToast("权限测试失败", "error")
     } finally {
       setTestingPermissions(false)
+    }
+  }
+
+  const handleTestIgnorePatterns = async () => {
+    setTestingIgnorePatterns(true)
+    try {
+      const results = await api.settings.testIgnorePatterns({
+        source_dir: formData.source_dir,
+        scan_ignore_patterns: formData.scan_ignore_patterns,
+      })
+      setIgnoredFilesResult(results)
+      setIgnoredFilesDialogOpen(true)
+    } catch {
+      addToast("测试忽略模式失败", "error")
+    } finally {
+      setTestingIgnorePatterns(false)
     }
   }
 
@@ -303,6 +368,67 @@ export default function Settings() {
           />
         </div>
       </div>
+
+      <div className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-lg p-6">
+        <h2 className="text-lg font-semibold mb-4 flex items-center">
+          <Folder className="w-5 h-5 mr-2" />
+          扫描设置
+        </h2>
+        <div className="space-y-2">
+          <SettingTextarea
+            label="忽略模式"
+            value={formData.scan_ignore_patterns}
+            onChange={(v) => handleChange("scan_ignore_patterns", v)}
+            description="扫描时忽略的文件/目录，每行一个模式，支持 gitignore 风格通配符"
+            placeholder="*.sample&#10;temp/&#10;@eaDir/&#10;**/cache/**"
+            rows={5}
+          />
+        </div>
+        <div className="mt-4">
+          <button
+            onClick={handleTestIgnorePatterns}
+            disabled={testingIgnorePatterns}
+            className="flex items-center px-4 py-2 border border-[hsl(var(--border))] rounded-md hover:bg-[hsl(var(--accent))] disabled:opacity-50"
+          >
+            {testingIgnorePatterns ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Eye className="w-4 h-4 mr-2" />
+            )}
+            预览被忽略的文件
+          </button>
+        </div>
+      </div>
+
+      <Dialog
+        open={ignoredFilesDialogOpen}
+        onClose={() => setIgnoredFilesDialogOpen(false)}
+        title="被忽略的文件"
+      >
+        {ignoredFilesResult && (
+          <div>
+            <p className="text-sm text-[hsl(var(--muted-foreground))] mb-3">
+              共 {ignoredFilesResult.total_count} 个视频文件匹配忽略模式
+            </p>
+            {ignoredFilesResult.ignored_files.length > 0 ? (
+              <div className="max-h-80 overflow-y-auto rounded border border-[hsl(var(--border))] bg-[hsl(var(--muted))]">
+                {ignoredFilesResult.ignored_files.map((file, i) => (
+                  <div
+                    key={i}
+                    className="px-3 py-1.5 text-sm font-mono border-b border-[hsl(var(--border))] last:border-0 break-all"
+                  >
+                    {file}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-[hsl(var(--muted-foreground))]">
+                当前没有文件匹配忽略模式
+              </p>
+            )}
+          </div>
+        )}
+      </Dialog>
 
       <div className="bg-[hsl(var(--card))] border border-[hsl(var(--border))] rounded-lg p-6">
         <h2 className="text-lg font-semibold mb-4 flex items-center">

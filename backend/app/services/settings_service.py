@@ -27,6 +27,7 @@ SETTINGS_KEYS = [
     "max_long_side",
     "max_short_side",
     "start_paused",
+    "scan_ignore_patterns",
 ]
 
 
@@ -45,6 +46,7 @@ class RuntimeSettings:
     max_long_side: int = 0
     max_short_side: int = 0
     start_paused: bool = False
+    scan_ignore_patterns: str = ""
 
     diettube_marker: str = field(default="DietTube-Processed", repr=False)
     duration_tolerance: float = field(default=0.01, repr=False)
@@ -123,6 +125,7 @@ class SettingsManager:
                 "start_paused",
                 lambda x: x.lower() in ("true", "1", "yes"),
             ),
+            "DIETTUBE_SCAN_IGNORE_PATTERNS": "scan_ignore_patterns",
         }
 
         for env_key, target in env_mapping.items():

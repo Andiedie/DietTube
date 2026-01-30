@@ -67,6 +67,7 @@ export interface Settings {
   max_long_side: number
   max_short_side: number
   start_paused: boolean
+  scan_ignore_patterns: string
 }
 
 export interface SettingsUpdate {
@@ -83,6 +84,7 @@ export interface SettingsUpdate {
   max_long_side?: number
   max_short_side?: number
   start_paused?: boolean
+  scan_ignore_patterns?: string
 }
 
 export interface TrashInfo {
@@ -128,6 +130,24 @@ export interface PermissionTestResponse {
   temp: PermissionTestResult
   config: PermissionTestResult
   archive: PermissionTestResult | null
+}
+
+export interface IgnorePatternsTestResponse {
+  ignored_files: string[]
+  total_count: number
+}
+
+export interface PermissionTestRequest {
+  source_dir: string
+  temp_dir: string
+  config_dir: string
+  original_file_strategy: string
+  archive_dir?: string
+}
+
+export interface IgnorePatternsTestRequest {
+  source_dir: string
+  scan_ignore_patterns: string
 }
 
 export interface DirectoryEntry {
@@ -232,8 +252,18 @@ export const api = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(params),
       }),
-    testPermissions: () =>
-      fetchJSON<PermissionTestResponse>(`${API_BASE}/settings/test-permissions`),
+    testPermissions: (params: PermissionTestRequest) =>
+      fetchJSON<PermissionTestResponse>(`${API_BASE}/settings/test-permissions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(params),
+      }),
+    testIgnorePatterns: (params: IgnorePatternsTestRequest) =>
+      fetchJSON<IgnorePatternsTestResponse>(`${API_BASE}/settings/test-ignore-patterns`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(params),
+      }),
   },
   trash: {
     list: () => fetchJSON<TrashList>(`${API_BASE}/trash/`),
