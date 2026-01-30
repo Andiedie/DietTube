@@ -192,11 +192,20 @@ async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   tasks: {
-    list: (params?: { status?: string; search?: string; limit?: number; offset?: number }) =>
+    list: (params?: {
+      status?: string
+      search?: string
+      limit?: number
+      offset?: number
+      sort_by?: "created_at" | "updated_at"
+      sort_order?: "asc" | "desc"
+    }) =>
       fetchJSON<TaskListResponse>(
         `${API_BASE}/tasks/?${new URLSearchParams({
           ...(params?.status && { status: params.status }),
           ...(params?.search && { search: params.search }),
+          ...(params?.sort_by && { sort_by: params.sort_by }),
+          ...(params?.sort_order && { sort_order: params.sort_order }),
           limit: String(params?.limit ?? 20),
           offset: String(params?.offset ?? 0),
         })}`

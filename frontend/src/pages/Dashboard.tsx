@@ -409,6 +409,7 @@ export default function Dashboard() {
   const { addToast } = useToast()
   const [showPauseDialog, setShowPauseDialog] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
+  const [statusFilter, setStatusFilter] = useState("")
   const [currentPage, setCurrentPage] = useState(0)
   const [pageSize, setPageSize] = useState(20)
 
@@ -424,8 +425,9 @@ export default function Dashboard() {
   })
 
   const { data: tasksData } = useQuery({
-    queryKey: ["tasks", searchQuery, currentPage, pageSize],
+    queryKey: ["tasks", statusFilter, searchQuery, currentPage, pageSize],
     queryFn: () => api.tasks.list({
+      status: statusFilter || undefined,
       search: searchQuery || undefined,
       limit: pageSize,
       offset: currentPage * pageSize,
@@ -641,6 +643,22 @@ export default function Dashboard() {
             )}
           </h3>
           <div className="flex items-center gap-3">
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value)
+                setCurrentPage(0)
+              }}
+              className="px-2 py-1.5 text-sm rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))]"
+            >
+              <option value="">全部状态</option>
+              <option value="in_progress">进行中</option>
+              <option value="pending">等待中</option>
+              <option value="completed">已完成</option>
+              <option value="failed">失败</option>
+              <option value="cancelled">已取消</option>
+              <option value="rolled_back">已回滚</option>
+            </select>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[hsl(var(--muted-foreground))]" />
               <input
