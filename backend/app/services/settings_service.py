@@ -46,7 +46,7 @@ class RuntimeSettings:
     archive_dir: str = ""
     max_long_side: int = 0
     max_short_side: int = 0
-    max_fps: int = 30
+    max_fps: int = 0
     start_paused: bool = False
     scan_ignore_patterns: str = ""
 

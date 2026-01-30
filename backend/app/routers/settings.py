@@ -26,6 +26,7 @@ class SettingsResponse(BaseModel):
     archive_dir: str
     max_long_side: int
     max_short_side: int
+    max_fps: int
     start_paused: bool
     scan_ignore_patterns: str
 
@@ -43,6 +44,7 @@ class SettingsUpdate(BaseModel):
     archive_dir: Optional[str] = None
     max_long_side: Optional[int] = None
     max_short_side: Optional[int] = None
+    max_fps: Optional[int] = None
     start_paused: Optional[bool] = None
     scan_ignore_patterns: Optional[str] = None
 
@@ -67,6 +69,7 @@ async def get_current_settings():
         archive_dir=settings.archive_dir or "",
         max_long_side=settings.max_long_side,
         max_short_side=settings.max_short_side,
+        max_fps=settings.max_fps,
         start_paused=settings.start_paused,
         scan_ignore_patterns=settings.scan_ignore_patterns,
     )
@@ -93,6 +96,7 @@ async def update_settings(updates: SettingsUpdate):
         archive_dir=settings.archive_dir or "",
         max_long_side=settings.max_long_side,
         max_short_side=settings.max_short_side,
+        max_fps=settings.max_fps,
         start_paused=settings.start_paused,
         scan_ignore_patterns=settings.scan_ignore_patterns,
     )
