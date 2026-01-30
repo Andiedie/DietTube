@@ -157,6 +157,9 @@ Environment variables use `DIETTUBE_` prefix (e.g., `DIETTUBE_VIDEO_CRF=28`).
 - `GET /api/trash/` - List trash files
 - `POST /api/trash/empty` - Empty trash
 
+### Filesystem
+- `GET /api/filesystem/browse?path=` - Browse server directories (for directory picker UI)
+
 ## Frontend Components
 
 ### Pages
@@ -167,6 +170,7 @@ Environment variables use `DIETTUBE_` prefix (e.g., `DIETTUBE_VIDEO_CRF=28`).
 ### Key Components
 - `Toast.tsx` - Notification system (success/error/info)
 - `Dialog.tsx` - Modal dialogs
+- `DirectoryPicker.tsx` - Server-side directory browser dialog
 - `Pagination.tsx` - Pagination controls
 - `PageSizeSelector.tsx` - Items per page selector
 

@@ -10,6 +10,7 @@ import {
   XCircle,
   ShieldCheck,
   Power,
+  FolderOpen,
 } from "lucide-react"
 import {
   api,
@@ -18,6 +19,7 @@ import {
   ApiRequestError,
 } from "@/lib/api"
 import { useToast } from "@/components/Toast"
+import { DirectoryPicker } from "@/components/DirectoryPicker"
 
 function SettingInput({
   label,
@@ -95,6 +97,54 @@ function SettingSelect({
         ))}
       </select>
     </div>
+  )
+}
+
+function SettingDirectory({
+  label,
+  value,
+  onChange,
+  description,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  description?: string
+}) {
+  const [pickerOpen, setPickerOpen] = useState(false)
+
+  return (
+    <>
+      <div className="flex items-center justify-between py-3 border-b border-[hsl(var(--border))] last:border-0">
+        <div className="flex-1">
+          <p className="font-medium">{label}</p>
+          {description && (
+            <p className="text-sm text-[hsl(var(--muted-foreground))]">
+              {description}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="px-3 py-1.5 rounded border border-[hsl(var(--border))] bg-[hsl(var(--background))] font-mono text-sm max-w-48 truncate">
+            {value || "/"}
+          </span>
+          <button
+            onClick={() => setPickerOpen(true)}
+            className="p-1.5 rounded border border-[hsl(var(--border))] hover:bg-[hsl(var(--accent))]"
+            title="浏览"
+          >
+            <FolderOpen className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+      <DirectoryPicker
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onSelect={onChange}
+        initialPath={value || "/"}
+        title={`选择${label}`}
+      />
+    </>
   )
 }
 
@@ -233,22 +283,22 @@ export default function Settings() {
           目录配置
         </h2>
         <div className="space-y-2">
-          <SettingInput
+          <SettingDirectory
             label="源目录"
             value={formData.source_dir}
-            onChange={(v) => handleChange("source_dir", String(v))}
+            onChange={(v) => handleChange("source_dir", v)}
             description="视频文件所在的目录"
           />
-          <SettingInput
+          <SettingDirectory
             label="临时目录"
             value={formData.temp_dir}
-            onChange={(v) => handleChange("temp_dir", String(v))}
+            onChange={(v) => handleChange("temp_dir", v)}
             description="用于处理和回收站存储"
           />
-          <SettingInput
+          <SettingDirectory
             label="配置目录"
             value={formData.config_dir}
-            onChange={(v) => handleChange("config_dir", String(v))}
+            onChange={(v) => handleChange("config_dir", v)}
             description="数据库和配置文件存储"
           />
         </div>
@@ -405,10 +455,10 @@ export default function Settings() {
             ]}
           />
           {formData.original_file_strategy === "archive" && (
-            <SettingInput
+            <SettingDirectory
               label="归档目录"
               value={formData.archive_dir}
-              onChange={(v) => handleChange("archive_dir", String(v))}
+              onChange={(v) => handleChange("archive_dir", v)}
               description="原始文件的归档位置"
             />
           )}

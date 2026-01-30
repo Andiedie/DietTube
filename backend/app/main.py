@@ -10,7 +10,7 @@ from app.database import init_db
 from app.services.settings_service import settings_manager, get_settings
 from app.services.recovery import perform_recovery
 from app.services.task_manager import task_manager
-from app.routers import tasks, settings as settings_router, trash
+from app.routers import tasks, settings as settings_router, trash, filesystem
 from app.errors import (
     AppError,
     app_error_handler,
@@ -64,6 +64,7 @@ app.add_exception_handler(Exception, general_exception_handler)
 app.include_router(tasks.router, prefix="/api/tasks", tags=["tasks"])
 app.include_router(settings_router.router, prefix="/api/settings", tags=["settings"])
 app.include_router(trash.router, prefix="/api/trash", tags=["trash"])
+app.include_router(filesystem.router, prefix="/api/filesystem", tags=["filesystem"])
 
 static_path = Path(__file__).parent.parent / "static"
 if static_path.exists():

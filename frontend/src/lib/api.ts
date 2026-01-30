@@ -130,6 +130,18 @@ export interface PermissionTestResponse {
   archive: PermissionTestResult | null
 }
 
+export interface DirectoryEntry {
+  name: string
+  path: string
+  is_dir: boolean
+}
+
+export interface BrowseResponse {
+  current_path: string
+  parent_path: string | null
+  entries: DirectoryEntry[]
+}
+
 async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
   const response = await fetch(url, options)
   const data = await response.json()
@@ -231,5 +243,9 @@ export const api = {
         `${API_BASE}/trash/empty`,
         { method: "POST" }
       ),
+  },
+  filesystem: {
+    browse: (path: string) =>
+      fetchJSON<BrowseResponse>(`${API_BASE}/filesystem/browse?path=${encodeURIComponent(path)}`),
   },
 }
