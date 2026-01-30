@@ -175,9 +175,24 @@ function LogMessage({ message }: { message: string }) {
   const displayText = copyMatch[2]
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(copyContent)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(copyContent)
+      } else {
+        const textarea = document.createElement('textarea')
+        textarea.value = copyContent
+        textarea.style.position = 'fixed'
+        textarea.style.left = '-9999px'
+        document.body.appendChild(textarea)
+        textarea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textarea)
+      }
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      console.error('Failed to copy')
+    }
   }
 
   return (
