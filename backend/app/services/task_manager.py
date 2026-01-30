@@ -342,6 +342,7 @@ class TaskManager:
                     status=TaskStatus.COMPLETED,
                     new_size=new_size,
                     new_duration=new_duration,
+                    error_message=None,
                 )
             )
 
