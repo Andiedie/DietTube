@@ -24,6 +24,7 @@ class TaskStatus(str, enum.Enum):
     FAILED = "failed"
     CANCELLED = "cancelled"
     ROLLED_BACK = "rolled_back"
+    SKIPPED = "skipped"
 
 
 class LogLevel(str, enum.Enum):

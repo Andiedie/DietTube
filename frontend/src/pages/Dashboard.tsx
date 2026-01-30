@@ -19,11 +19,14 @@ import {
   FileText,
   Copy,
   Check,
+  Trash2,
+  FastForward,
 } from "lucide-react"
 import { api, type Task, type TaskProgress, type TaskLog, ApiRequestError } from "@/lib/api"
 import { formatBytes, formatDuration, cn } from "@/lib/utils"
 import { useToast } from "@/components/Toast"
 import { Dialog, DialogButton } from "@/components/Dialog"
+import { DropdownMenu, DropdownItem, DropdownSeparator } from "@/components/DropdownMenu"
 
 function StatCard({
   title,
@@ -142,6 +145,11 @@ function TaskStatusBadge({ status }: { status: string }) {
       className: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
       label: "已回滚",
     },
+    skipped: {
+      icon: FastForward,
+      className: "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200",
+      label: "已跳过",
+    },
   }
 
   const config = statusConfig[status] || statusConfig.pending
@@ -212,6 +220,7 @@ function LogMessage({ message }: { message: string }) {
 function TaskRow({ task, onError, onSuccess }: { task: Task; onError: (msg: string) => void; onSuccess: (msg: string) => void }) {
   const queryClient = useQueryClient()
   const [showRollbackDialog, setShowRollbackDialog] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [showLogsDialog, setShowLogsDialog] = useState(false)
   const [logs, setLogs] = useState<TaskLog[]>([])
   const [logsLoading, setLogsLoading] = useState(false)
@@ -306,6 +315,21 @@ function TaskRow({ task, onError, onSuccess }: { task: Task; onError: (msg: stri
     },
   })
 
+  const deleteMutation = useMutation({
+    mutationFn: () => api.tasks.delete(task.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] })
+      queryClient.invalidateQueries({ queryKey: ["stats"] })
+      setShowDeleteDialog(false)
+      onSuccess("任务已删除")
+    },
+    onError: (error) => {
+      const message = error instanceof ApiRequestError ? error.message : "删除失败"
+      setShowDeleteDialog(false)
+      onError(message)
+    },
+  })
+
   const savedBytes = task.new_size > 0 ? task.original_size - task.new_size : 0
   const savedPercent =
     task.original_size > 0 ? (savedBytes / task.original_size) * 100 : 0
@@ -335,36 +359,49 @@ function TaskRow({ task, onError, onSuccess }: { task: Task; onError: (msg: stri
       </td>
       <td className="px-4 py-3 text-sm">
         <div className="flex items-center gap-2">
-          {task.status !== "pending" && (
-            <button
-              onClick={handleShowLogs}
-              className="flex items-center text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:underline"
-              title="查看日志"
-            >
-              <FileText className="w-3 h-3 mr-1" />
-              日志
-            </button>
-          )}
-          {(task.status === "failed" || task.status === "cancelled" || task.status === "rolled_back") ? (
-            <button
-              onClick={() => retryMutation.mutate()}
-              disabled={retryMutation.isPending}
-              className="flex items-center text-[hsl(var(--primary))] hover:underline disabled:opacity-50"
-            >
-              <RotateCcw className="w-3 h-3 mr-1" />
-              重试
-            </button>
-          ) : null}
-          {task.status === "completed" ? (
-            <button
-              onClick={() => setShowRollbackDialog(true)}
-              disabled={rollbackMutation.isPending}
-              className="flex items-center text-orange-600 dark:text-orange-400 hover:underline disabled:opacity-50"
-            >
-              <Undo2 className="w-3 h-3 mr-1" />
-              回滚
-            </button>
-          ) : null}
+          <DropdownMenu>
+            {/* 日志 - 所有状态 */}
+            <DropdownItem onClick={handleShowLogs} icon={FileText}>
+              查看日志
+            </DropdownItem>
+
+            {/* 重试 - 失败/取消/已回滚/已跳过/已完成 */}
+            {(task.status === "failed" || task.status === "cancelled" || task.status === "rolled_back" || task.status === "skipped" || task.status === "completed") && (
+              <DropdownItem
+                onClick={() => retryMutation.mutate()}
+                disabled={retryMutation.isPending}
+                icon={RotateCcw}
+              >
+                重试
+              </DropdownItem>
+            )}
+
+            {/* 回滚 - 仅已完成 */}
+            {task.status === "completed" && (
+              <DropdownItem
+                onClick={() => setShowRollbackDialog(true)}
+                disabled={rollbackMutation.isPending}
+                icon={Undo2}
+              >
+                回滚
+              </DropdownItem>
+            )}
+
+            {/* 删除 - 非运行中状态 */}
+            {!["scanning", "transcoding", "verifying", "installing"].includes(task.status) && (
+              <>
+                <DropdownSeparator />
+                <DropdownItem
+                  onClick={() => setShowDeleteDialog(true)}
+                  disabled={deleteMutation.isPending}
+                  variant="danger"
+                  icon={Trash2}
+                >
+                  删除
+                </DropdownItem>
+              </>
+            )}
+          </DropdownMenu>
         </div>
         {task.error_message && (
           <span
@@ -444,6 +481,41 @@ function TaskRow({ task, onError, onSuccess }: { task: Task; onError: (msg: stri
                 disabled={rollbackMutation.isPending}
               >
                 {rollbackMutation.isPending ? "回滚中..." : "确认回滚"}
+              </DialogButton>
+            </div>
+          </div>
+        </Dialog>
+
+        <Dialog
+          open={showDeleteDialog}
+          onClose={() => setShowDeleteDialog(false)}
+          title="确认删除"
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-[hsl(var(--muted-foreground))]">
+              删除任务将执行以下操作：
+            </p>
+            <ul className="text-sm space-y-2 list-disc list-inside text-[hsl(var(--foreground))]">
+              <li>从数据库中删除此任务及其日志</li>
+              {task.status === "completed" && (
+                <li className="text-orange-600 dark:text-orange-400">
+                  回收站中的原始文件将被保留，不会被删除
+                </li>
+              )}
+            </ul>
+            <p className="text-sm font-medium text-[hsl(var(--foreground))]">
+              文件：{task.relative_path}
+            </p>
+            <div className="flex justify-end gap-2 pt-2">
+              <DialogButton variant="secondary" onClick={() => setShowDeleteDialog(false)}>
+                取消
+              </DialogButton>
+              <DialogButton
+                variant="danger"
+                onClick={() => deleteMutation.mutate()}
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending ? "删除中..." : "确认删除"}
               </DialogButton>
             </div>
           </div>
@@ -710,6 +782,7 @@ export default function Dashboard() {
               <option value="failed">失败</option>
               <option value="cancelled">已取消</option>
               <option value="rolled_back">已回滚</option>
+              <option value="skipped">已跳过</option>
             </select>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[hsl(var(--muted-foreground))]" />

@@ -90,7 +90,6 @@ async def scan_directory() -> list[Path]:
     source_dir = settings.source_path
     extensions = settings.video_extensions
     marker = settings.diettube_marker
-    min_bitrate_mbps = settings.min_bitrate_mbps
 
     ignore_spec = None
     if settings.scan_ignore_patterns.strip():
@@ -132,10 +131,6 @@ async def scan_directory() -> list[Path]:
 
         metadata = await get_video_metadata(file_path)
         if metadata and is_already_processed(metadata, marker):
-            continue
-
-        if is_low_bitrate(metadata, min_bitrate_mbps):
-            logger.debug(f"Skipping low bitrate file: {relative_path}")
             continue
 
         new_files.append(file_path)

@@ -11,7 +11,11 @@ from sqlalchemy import select, update, func as sql_func, delete
 from app.services.settings_service import get_settings
 from app.database import async_session_maker
 from app.models import Task, TaskStatus, ProcessingStats, TaskLog, LogLevel
-from app.services.scanner import get_video_metadata
+from app.services.scanner import (
+    get_video_metadata,
+    get_video_bitrate_mbps,
+    is_low_bitrate,
+)
 from app.services.transcoder import (
     transcode_file,
     TranscodeProgress,
@@ -157,6 +161,17 @@ class TaskManager:
             metadata = await get_video_metadata(source_path)
             if metadata:
                 await self._log_media_info(task.id, metadata)
+
+            if is_low_bitrate(metadata, settings.min_bitrate_mbps):
+                bitrate = get_video_bitrate_mbps(metadata) or 0
+                await self._log(
+                    task.id,
+                    f"码率 {bitrate:.2f} Mbps 低于阈值 {settings.min_bitrate_mbps} Mbps，跳过处理",
+                    LogLevel.WARNING,
+                )
+                await self._skip_task(task.id, f"码率过低 ({bitrate:.2f} Mbps)")
+                return
+
             original_duration = (
                 float(metadata.get("format", {}).get("duration", 0)) if metadata else 0
             )
@@ -356,6 +371,16 @@ class TaskManager:
             await session.commit()
         logger.info(f"Task {task_id} reset to pending")
 
+    async def _skip_task(self, task_id: int, reason: str):
+        async with async_session_maker() as session:
+            await session.execute(
+                update(Task)
+                .where(Task.id == task_id)
+                .values(status=TaskStatus.SKIPPED, error_message=reason)
+            )
+            await session.commit()
+        logger.info(f"Task {task_id} skipped: {reason}")
+
     async def _complete_task(
         self,
         task_id: int,
@@ -446,12 +471,16 @@ class TaskManager:
         duration = float(format_info.get("duration", 0))
         duration_str = f"{int(duration // 60)}m {int(duration % 60)}s"
 
+        bitrate_mbps = get_video_bitrate_mbps(metadata)
+        bitrate_str = f"{bitrate_mbps:.2f} Mbps" if bitrate_mbps else "未知"
+
         summary_parts = []
         if video_info:
             summary_parts.append(f"视频: {video_info}")
         if audio_info:
             summary_parts.append(f"音频: {audio_info}")
         summary_parts.append(f"时长: {duration_str}")
+        summary_parts.append(f"码率: {bitrate_str}")
 
         summary = " | ".join(summary_parts)
         raw_json = json.dumps(metadata, ensure_ascii=False)

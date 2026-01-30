@@ -236,6 +236,10 @@ export const api = {
         `${API_BASE}/tasks/${taskId}/rollback`,
         { method: "POST" }
       ),
+    delete: (taskId: number) =>
+      fetchJSON<{ message: string }>(`${API_BASE}/tasks/${taskId}`, {
+        method: "DELETE",
+      }),
     getLogs: (taskId: number) =>
       fetchJSON<{ logs: TaskLog[] }>(`${API_BASE}/tasks/${taskId}/logs`),
     getQueueStatus: () =>

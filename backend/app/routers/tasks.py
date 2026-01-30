@@ -83,6 +83,7 @@ STATUS_GROUP_MAP = {
     "failed": [TaskStatus.FAILED],
     "cancelled": [TaskStatus.CANCELLED],
     "rolled_back": [TaskStatus.ROLLED_BACK],
+    "skipped": [TaskStatus.SKIPPED],
 }
 
 STATUS_PRIORITY = {
@@ -95,6 +96,7 @@ STATUS_PRIORITY = {
     TaskStatus.COMPLETED: 3,
     TaskStatus.CANCELLED: 4,
     TaskStatus.ROLLED_BACK: 5,
+    TaskStatus.SKIPPED: 6,
 }
 
 
@@ -280,9 +282,11 @@ async def retry_task(task_id: int, db: AsyncSession = Depends(get_db)):
         TaskStatus.FAILED,
         TaskStatus.CANCELLED,
         TaskStatus.ROLLED_BACK,
+        TaskStatus.SKIPPED,
+        TaskStatus.COMPLETED,
     ]:
         raise TaskError(
-            "只有失败、已取消或已回滚的任务才能重试",
+            "只有失败、已取消、已回滚、已跳过或已完成的任务才能重试",
             {"task_id": task_id, "current_status": task.status.value},
         )
 
@@ -294,6 +298,35 @@ async def retry_task(task_id: int, db: AsyncSession = Depends(get_db)):
     await db.commit()
 
     return {"message": "Task queued for retry"}
+
+
+@router.delete("/{task_id}")
+async def delete_task(task_id: int, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Task).where(Task.id == task_id))
+    task = result.scalar_one_or_none()
+
+    if not task:
+        raise NotFoundError("任务不存在", {"task_id": task_id})
+
+    running_statuses = [
+        TaskStatus.SCANNING,
+        TaskStatus.TRANSCODING,
+        TaskStatus.VERIFYING,
+        TaskStatus.INSTALLING,
+    ]
+    if task.status in running_statuses:
+        raise TaskError(
+            "无法删除运行中的任务",
+            {"task_id": task_id, "current_status": task.status.value},
+        )
+
+    from sqlalchemy import delete
+
+    await db.execute(delete(TaskLog).where(TaskLog.task_id == task_id))
+    await db.execute(delete(Task).where(Task.id == task_id))
+    await db.commit()
+
+    return {"message": "任务已删除"}
 
 
 class QueueStatusResponse(BaseModel):
